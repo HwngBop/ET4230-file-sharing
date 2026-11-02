@@ -1,0 +1,16 @@
+# ==============================
+# ET4230 - Client Server File Sharing
+# Python 3.11.x
+# ==============================
+
+# Data processing for benchmark results
+pandas==2.3.3
+
+# Plotting experiment results
+matplotlib==3.10.7
+
+# Automated testing
+pytest==8.4.2
+
+# System / process information for experiment metadata
+psutil==7.1.3
