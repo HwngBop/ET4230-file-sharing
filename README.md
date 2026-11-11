@@ -219,4 +219,4 @@ python scripts/generate_test_files.py
 python scripts/run_baseline.py --host 127.0.0.1 --port 5000 --network-type loopback --server-metadata results/server-host.json --download
 ```
 
-CSV ở `results/raw/baseline.csv`; metadata gần nhất ở `results/environment.json`, bản lưu từng phiên ở `results/environments/`. Chạy localhost tạo số liệu loopback, không đại diện cho LAN/Wi-Fi giữa hai máy. CSV và metadata được tạo khi chạy, không kèm trong commit mã nguồn.
+CSV ở `results/raw/baseline.csv`; metadata gần nhất ở `results/environment.json`, bản lưu từng phiên ở `results/environments/`. Chạy localhost tạo số liệu loopback, không đại diện cho LAN/Wi-Fi giữa hai máy. Kết quả loopback đã lưu trong `results/`; mỗi lần chạy tiếp theo sẽ tạo thêm dữ liệu. Xem [kết quả kiểm chứng](results/verification.md).

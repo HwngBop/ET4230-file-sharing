@@ -249,7 +249,7 @@ Có thể dùng `python -m pytest -q` sau khi cài pytest. Test tạo dữ liệ
 - [ ] Có code và lệnh tái lập; không nhập tay số benchmark.
 - [ ] Nếu nộp minh chứng LAN, đã chạy lại trên hai máy thật.
 
-Đã kiểm chứng logic qua 6 lượt truyền loopback thành công và 44 kiểm thử tự động. CSV, metadata và log thí nghiệm không kèm trong commit mã nguồn; chạy các lệnh trên để tạo kết quả tại môi trường thực tế. Loopback chưa thay demo hai máy theo protocol của nhóm. Sprint 1 chưa cần plot, mean/std, 5 repetitions hay multi-client.
+Đã kiểm chứng logic qua 6 lượt truyền loopback thành công và 44 kiểm thử tự động. CSV, metadata và log của lần đo loopback nằm trong `results/`; xem `results/verification.md`. Chạy các lệnh trên để tạo kết quả tại môi trường thực tế. Loopback chưa thay demo hai máy theo protocol của nhóm. Sprint 1 chưa cần plot, mean/std, 5 repetitions hay multi-client.
 
 ## 8. Lỗi thường gặp
 

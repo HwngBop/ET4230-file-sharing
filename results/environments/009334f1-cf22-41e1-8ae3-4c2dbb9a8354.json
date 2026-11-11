@@ -1,0 +1,40 @@
+{
+  "environment_id": "009334f1-cf22-41e1-8ae3-4c2dbb9a8354",
+  "collected_at": "2026-11-11T13:39:16.804159+00:00",
+  "client": {
+    "role": "client",
+    "collected_at": "2026-11-11T13:39:16.803498+00:00",
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "python_version": "3.12.14",
+    "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+    "logical_cpu_count": 3,
+    "ram_bytes": 10452459520,
+    "hardware_scope": "OS-visible resources; may describe a container/VM",
+    "ip": "127.0.0.1",
+    "network_type": "loopback",
+    "chunk_size_bytes": 65536,
+    "commit_sha": "e646e474355ad3a32d9227fd37600b24a41fe0bd",
+    "working_tree_dirty": true
+  },
+  "server": {
+    "role": "server",
+    "collected_at": "2026-11-11T13:39:11.310664+00:00",
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "python_version": "3.12.14",
+    "cpu": "INTEL(R) XEON(R) PLATINUM 8573C",
+    "logical_cpu_count": 3,
+    "ram_bytes": 10452459520,
+    "hardware_scope": "OS-visible resources; may describe a container/VM",
+    "ip": "127.0.0.1",
+    "network_type": "loopback",
+    "chunk_size_bytes": 65536,
+    "commit_sha": "e646e474355ad3a32d9227fd37600b24a41fe0bd",
+    "working_tree_dirty": true
+  },
+  "port": 5000,
+  "chunk_size_bytes": 65536,
+  "num_clients": 1,
+  "bandwidth_limit_mbps": "unlimited",
+  "bytes_per_MB": 1000000,
+  "timing_method": "Client perf_counter: before request through completion response, checksum verification and download .part rename. Upload source hashing, CSV writing, metadata and connection setup excluded. No fsync/durable-storage guarantee."
+}
