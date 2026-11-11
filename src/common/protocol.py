@@ -1,7 +1,10 @@
-"""Shared framing for JSON commands and length-delimited binary payloads."""
+"""Shared newline-delimited JSON framing and length-delimited binary payloads.
+
+On the wire: compact UTF-8 JSON + LF; optional binary bytes follow when
+specified by a file_size field. TCP does not preserve message boundaries.
+"""
 
 import json
-
 
 MAX_HEADER_BYTES = 65536
 
@@ -24,6 +27,8 @@ class Connection:
         self.sending_payload = False
 
     def receive_header(self, max_bytes=MAX_HEADER_BYTES):
+        if max_bytes is not None and (type(max_bytes) is not int or max_bytes < 1):
+            raise ValueError("max_bytes must be a positive integer or None")
         while True:
             newline = self.buffer.find(b"\n")
             if newline >= 0:
@@ -50,6 +55,8 @@ class Connection:
         return header
 
     def receive_chunk(self, maximum):
+        if type(maximum) is not int or maximum < 1:
+            raise ValueError("maximum must be a positive integer")
         if self.buffer:
             data = bytes(self.buffer[:maximum])
             del self.buffer[:maximum]
@@ -64,4 +71,9 @@ class Connection:
 
 
 def encode_header(header):
-    return (json.dumps(header, ensure_ascii=True, separators=(",", ":")) + "\n").encode("utf-8")
+    if not isinstance(header, dict):
+        raise TypeError("Header must be a JSON object (dict)")
+    data = (json.dumps(header, ensure_ascii=True, allow_nan=False, separators=(",", ":")) + "\n").encode("utf-8")
+    if len(data) > MAX_HEADER_BYTES:
+        raise ProtocolError("HEADER_TOO_LARGE", f"Header exceeds {MAX_HEADER_BYTES} bytes", fatal=True)
+    return data

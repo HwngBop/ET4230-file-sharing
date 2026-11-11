@@ -1,13 +1,11 @@
-"""Command-line client for the ET4230 file sharing server (Sprint 1).
+"""Command-line client for the ET4230 TCP file-sharing system (Sprint 1).
 
-Run from the project root:
-    python src/client/client.py
-or:
-    cd src && python -m client.client
-
-Commands: connect, upload, download, list, quit (plus help).
+From project root: python src/client/client.py
+Commands: connect, upload, download, list, quit, help.
 """
 
+import hashlib
+import re
 import socket
 import sys
 import time
@@ -27,7 +25,6 @@ DEFAULT_PORT = 5000
 SOCKET_TIMEOUT = 30
 CHUNK_SIZE = 65536
 
-# Per protocol.md, the server closes the connection after these errors.
 FATAL_ERROR_CODES = {
     "INVALID_HEADER",
     "HEADER_TOO_LARGE",
@@ -39,7 +36,7 @@ FATAL_ERROR_CODES = {
 HELP_TEXT = """Commands:
   connect <ip> [port]   Connect to the server (default port 5000)
   upload <file>         Upload a local file (also looks in client_data/uploads/)
-  download <filename>   Download a file into client_data/downloads/
+  download <filename>   Download into client_data/downloads/
   list                  List files on the server
   quit                  Disconnect and exit
   help                  Show this help"""
@@ -59,15 +56,32 @@ class ServerError(ClientError):
 
 def format_size(num_bytes):
     size = float(num_bytes)
-    for unit in ("B", "KB", "MB", "GB"):
-        if size < 1024 or unit == "GB":
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if size < 1024 or unit == "GiB":
             return f"{int(size)} B" if unit == "B" else f"{size:.1f} {unit}"
         size /= 1024
 
 
 def print_result(elapsed, num_bytes):
-    speed = num_bytes / elapsed / (1024 * 1024) if elapsed > 0 else 0.0
-    print(f"Time: {elapsed:.2f} s, Speed: {speed:.2f} MB/s")
+    # Network throughput: 1 Mbps = 1,000,000 bits/s (not MB/s).
+    mbps = (num_bytes * 8 / elapsed / 1_000_000) if elapsed > 0 else 0.0
+    print(f"Time: {elapsed:.3f} s, Application throughput: {mbps:.2f} Mbps")
+
+
+def sha256_file(path):
+    digest = hashlib.sha256()
+    with open(path, "rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def verify_checksum(value, expected):
+    """Raise ClientError if the server's checksum is absent/invalid/mismatched."""
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", value):
+        raise ClientError("Server did not return a valid SHA-256 checksum")
+    if value.lower() != expected:
+        raise ClientError("CHECKSUM_MISMATCH: received file bytes differ from expected SHA-256")
 
 
 class FileClient:
@@ -78,8 +92,6 @@ class FileClient:
     @property
     def connected(self):
         return self.sock is not None
-
-    # ---------- connection handling ----------
 
     def connect(self, host, port):
         if self.connected:
@@ -100,7 +112,6 @@ class FileClient:
         print("Connected to server.")
 
     def drop(self):
-        """Close the socket without talking to the server."""
         if self.sock is not None:
             try:
                 self.sock.close()
@@ -114,8 +125,8 @@ class FileClient:
             raise ClientError("Not connected. Use: connect <ip> [port]")
 
     def read_response(self):
-        """Read one response header; raise ServerError for status = ERROR."""
-        header = self.conn.receive_header(max_bytes=None)
+        """Read one bounded response JSON header; raise ServerError on ERROR."""
+        header = self.conn.receive_header()  # Enforce MAX_HEADER_BYTES (no unbounded reads)
         if header is None:
             raise PeerDisconnected("Server closed the connection")
         if header.get("status") == "ERROR":
@@ -129,12 +140,7 @@ class FileClient:
     @staticmethod
     def expect(header, status, command):
         if header.get("status") != status or header.get("command") != command:
-            raise ProtocolError(
-                "INVALID_HEADER",
-                f"Unexpected response (wanted {status}/{command}): {header}",
-            )
-
-    # ---------- commands ----------
+            raise ProtocolError("INVALID_HEADER", f"Unexpected response (wanted {status}/{command}): {header}")
 
     def list_files(self):
         self.require_connection()
@@ -142,6 +148,8 @@ class FileClient:
         header = self.read_response()
         self.expect(header, "OK", "LIST")
         files = header.get("files", [])
+        if not isinstance(files, list) or any(not isinstance(f, str) for f in files):
+            raise ProtocolError("INVALID_HEADER", "LIST must return a list of filenames")
         if not files:
             print("Server has no files.")
         else:
@@ -154,11 +162,15 @@ class FileClient:
         path = self.find_local_file(raw_path)
         file_size = path.stat().st_size
         filename = path.name
+        source_sha256 = sha256_file(path)
         print(f"Uploading {filename}")
         print(f"Size: {format_size(file_size)}")
 
         start = time.perf_counter()
-        self.conn.send_header({"command": "UPLOAD", "filename": filename, "file_size": file_size})
+        self.conn.send_header({
+            "command": "UPLOAD", "filename": filename,
+            "file_size": file_size, "sha256": source_sha256,
+        })
         self.expect(self.read_response(), "READY", "UPLOAD")
 
         sent = 0
@@ -166,14 +178,19 @@ class FileClient:
             while sent < file_size:
                 chunk = stream.read(min(CHUNK_SIZE, file_size - sent))
                 if not chunk:
-                    # File shrank while uploading; the server is waiting for more bytes.
                     self.drop()
                     raise ClientError("Local file changed during upload. Connection closed.")
                 self.sock.sendall(chunk)
                 sent += len(chunk)
 
-        self.expect(self.read_response(), "SUCCESS", "UPLOAD")
-        print("Transfer completed.")
+        confirmation = self.read_response()
+        self.expect(confirmation, "SUCCESS", "UPLOAD")
+        try:
+            verify_checksum(confirmation.get("sha256"), source_sha256)
+        except ClientError:
+            self.drop()
+            raise
+        print("Transfer completed; SHA-256 MATCH.")
         print_result(time.perf_counter() - start, file_size)
 
     def download(self, filename):
@@ -187,7 +204,7 @@ class FileClient:
         print(f"Downloading {filename}")
         start = time.perf_counter()
         self.conn.send_header({"command": "DOWNLOAD", "filename": filename})
-        header = self.read_response()  # FILE_NOT_FOUND etc. raise ServerError here
+        header = self.read_response()
         self.expect(header, "OK", "DOWNLOAD")
         file_size = header.get("file_size")
         if type(file_size) is not int or file_size < 0:
@@ -197,18 +214,24 @@ class FileClient:
 
         try:
             received = 0
+            digest = hashlib.sha256()
             with open(partial, "wb") as stream:
                 while received < file_size:
                     chunk = self.conn.receive_chunk(min(CHUNK_SIZE, file_size - received))
-                    stream.write(chunk)
-                    received += len(chunk)
-            self.expect(self.read_response(), "SUCCESS", "DOWNLOAD")
+                    written = stream.write(chunk)
+                    if written != len(chunk):
+                        raise OSError("Short write while saving downloaded file")
+                    digest.update(chunk)
+                    received += written
+            confirmation = self.read_response()
+            self.expect(confirmation, "SUCCESS", "DOWNLOAD")
+            verify_checksum(confirmation.get("sha256"), digest.hexdigest())
             partial.replace(target)
         except BaseException:
             partial.unlink(missing_ok=True)
             raise
 
-        print("Transfer completed.")
+        print("Transfer completed; SHA-256 MATCH.")
         print(f"Saved to: {target}")
         print_result(time.perf_counter() - start, file_size)
 
@@ -225,8 +248,6 @@ class FileClient:
         finally:
             self.drop()
 
-    # ---------- helpers ----------
-
     @staticmethod
     def find_local_file(raw_path):
         if not raw_path:
@@ -238,8 +259,6 @@ class FileClient:
         raise ClientError(f"Local file does not exist: {raw_path}")
 
 
-# ---------- CLI ----------
-
 def unquote(text):
     text = text.strip()
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
@@ -248,7 +267,6 @@ def unquote(text):
 
 
 def handle_command(client, line):
-    """Run one command line. Return False when the program should exit."""
     parts = line.strip().split(None, 1)
     if not parts:
         return True

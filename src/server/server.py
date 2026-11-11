@@ -1,7 +1,9 @@
-"""A blocking TCP server that handles one client at a time."""
+"""A blocking TCP server that handles one client at a time (Sprint 1)."""
 
+import hashlib
 import logging
 import os
+import re
 import socket
 import sys
 from pathlib import Path
@@ -33,7 +35,6 @@ class FileServer:
             raise RuntimeError("Server is already listening")
         listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-            # Windows exclusive binding avoids another process sharing the port.
             if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
                 listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
             else:
@@ -94,7 +95,7 @@ class FileServer:
             return
         try:
             connection.send_header({"status": "ERROR", "code": code, "message": message})
-        except OSError:
+        except (OSError, ProtocolError):
             pass
 
     def _handle_client(self, client, address):
@@ -147,8 +148,16 @@ class FileServer:
             raise ProtocolError("INVALID_FILE_SIZE", "file_size must be a nonnegative integer")
         if file_size > self.config.max_file_size:
             raise ProtocolError("FILE_TOO_LARGE", "Upload exceeds configured max_file_size")
+        expected_sha256 = request.get("sha256")
+        if expected_sha256 is not None and (
+            not isinstance(expected_sha256, str)
+            or not re.fullmatch(r"[0-9a-fA-F]{64}", expected_sha256)
+        ):
+            raise ProtocolError("INVALID_CHECKSUM", "sha256 must be 64 hexadecimal characters")
+
         temporary_path = None
         context["transferred_bytes"] = 0
+        digest = hashlib.sha256()
         try:
             with self.storage.create_upload() as stream:
                 temporary_path = Path(stream.name)
@@ -159,13 +168,23 @@ class FileServer:
                     written = stream.write(chunk)
                     if written != len(chunk):
                         raise OSError("Short write while saving uploaded file")
+                    digest.update(chunk)
                     remaining -= written
                     context["transferred_bytes"] += written
                 stream.flush()
                 if stream.tell() != file_size:
                     raise ProtocolError("TRANSFER_INCOMPLETE", "Uploaded byte count does not match metadata", fatal=True)
+
+            actual_sha256 = digest.hexdigest()
+            context["sha256"] = actual_sha256
+            if expected_sha256 is not None and actual_sha256 != expected_sha256.lower():
+                # Do not publish the temporary upload or overwrite an existing file.
+                raise ProtocolError("CHECKSUM_MISMATCH", "Uploaded SHA-256 does not match source checksum")
             self.storage.commit_upload(temporary_path, target)
-            connection.send_header({"status": "SUCCESS", "command": "UPLOAD", "filename": target.name, "file_size": file_size})
+            connection.send_header({
+                "status": "SUCCESS", "command": "UPLOAD", "filename": target.name,
+                "file_size": file_size, "sha256": actual_sha256,
+            })
         finally:
             if temporary_path is not None:
                 temporary_path.unlink(missing_ok=True)
@@ -175,19 +194,29 @@ class FileServer:
             file_size = os.fstat(stream.fileno()).st_size
             context["file_size"] = file_size
             context["transferred_bytes"] = 0
-            connection.send_header({"status": "OK", "command": "DOWNLOAD", "filename": request["filename"], "file_size": file_size})
+            connection.send_header({
+                "status": "OK", "command": "DOWNLOAD",
+                "filename": request["filename"], "file_size": file_size,
+            })
             connection.sending_payload = True
+            digest = hashlib.sha256()
             remaining = file_size
             while remaining:
                 chunk = stream.read(min(remaining, self.config.chunk_size))
                 if not chunk:
-                    # A partial payload cannot be followed by a JSON error frame.
                     raise PeerDisconnected("Download source changed before all file bytes were sent")
                 connection.sock.sendall(chunk)
+                digest.update(chunk)
                 remaining -= len(chunk)
                 context["transferred_bytes"] += len(chunk)
             connection.sending_payload = False
-            connection.send_header({"status": "SUCCESS", "command": "DOWNLOAD", "filename": request["filename"], "file_size": file_size})
+            actual_sha256 = digest.hexdigest()
+            context["sha256"] = actual_sha256
+            connection.send_header({
+                "status": "SUCCESS", "command": "DOWNLOAD",
+                "filename": request["filename"], "file_size": file_size,
+                "sha256": actual_sha256,
+            })
 
 
 def main(argv=None):
@@ -215,5 +244,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
-#lmao
