@@ -176,24 +176,28 @@ python scripts/smoke_test.py --host 192.168.1.10 --port 5000 --size 10485760
 
 Kết quả kỳ vọng gồm `UPLOAD OK`, `LIST OK`, `DOWNLOAD OK`, `SHA-256 MATCH`, `QUIT OK`. Ghi lại kết quả màn hình, log server và Wireshark `.pcapng` khi chạy hai máy thật.
 
+<CodeBlock language="markdown" editable>
 ## 8. Phương pháp đo hiệu năng
 
-ĐĐịnh nghĩa của nhóm cho **application throughput**:
+
+Định nghĩa của nhóm cho application throughput:
 
 $$
-\text{Throughput (Mbps)} = \frac{\text{file\_size\_bytes} \times 8}{\text{transfer\_time\_s} \times 10^6}
+\mathrm{Throughput}\;(\mathrm{Mbps}) =
+\frac{8 \times \mathrm{FileSizeBytes}}
+{10^{6} \times \mathrm{TransferTimeSeconds}}
 $$
 
 Trong đó:
-
-- `file_size_bytes`: Kích thước tệp truyền, tính bằng byte.
-- `transfer_time_s`: Thời gian hoàn tất quá trình truyền, tính bằng giây.
-- `Throughput (Mbps)`: Thông lượng ở tầng ứng dụng, tính bằng megabit/giây.
-**Phương pháp đo:**
-
+- file_size_bytes: Kích thước tệp truyền, tính bằng byte.
+- transfer_time_s: Thời gian hoàn tất quá trình truyền, tính bằng giây.
+- Throughput (Mbps): Thông lượng ở tầng ứng dụng, tính bằng megabit/giây.
+Phương pháp đo
 Thời gian đo phía Client được tính từ lúc bắt đầu gửi request đến khi nhận completion response và hoàn tất xác minh checksum.
+
 Đối với upload, không tính thời gian tính SHA-256 của file nguồn trước khi bắt đầu truyền.
-Đây là **application throughput**, không phải tốc độ đường truyền vật lý hay bit rate trên wire.
+
+Đây là application throughput, không phải tốc độ đường truyền vật lý hay bit rate trên wire.
 
 ## 9. Log, kết quả, minh chứng
 
