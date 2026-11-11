@@ -178,13 +178,22 @@ Kết quả kỳ vọng gồm `UPLOAD OK`, `LIST OK`, `DOWNLOAD OK`, `SHA-256 MA
 
 ## 8. Phương pháp đo hiệu năng
 
-Định nghĩa của nhóm cho **application throughput**:
+ĐĐịnh nghĩa của nhóm cho **application throughput**:
 
-\[
+$$
 \text{Throughput (Mbps)} = \frac{\text{file\_size\_bytes} \times 8}{\text{transfer\_time\_s} \times 10^6}
-\]
+$$
 
-Thời gian đo phía Client từ lúc gửi request tới sau khi nhận completion response và xác minh checksum, **không tính bước tính SHA-256 nguồn trước khi bắt đầu upload**. Đây là throughput ở tầng ứng dụng, không phải tốc độ link hay bit rate trên wire. Benchmark Sprint 3 cần ghi rõ thay đổi file size, chunk size, số client và bandwidth, số lần lặp và thiết bị/mạng.
+Trong đó:
+
+- `file_size_bytes`: Kích thước tệp truyền, tính bằng byte.
+- `transfer_time_s`: Thời gian hoàn tất quá trình truyền, tính bằng giây.
+- `Throughput (Mbps)`: Thông lượng ở tầng ứng dụng, tính bằng megabit/giây.
+**Phương pháp đo:**
+
+Thời gian đo phía Client được tính từ lúc bắt đầu gửi request đến khi nhận completion response và hoàn tất xác minh checksum.
+Đối với upload, không tính thời gian tính SHA-256 của file nguồn trước khi bắt đầu truyền.
+Đây là **application throughput**, không phải tốc độ đường truyền vật lý hay bit rate trên wire.
 
 ## 9. Log, kết quả, minh chứng
 
@@ -193,8 +202,3 @@ Thời gian đo phía Client từ lúc gửi request tới sau khi nhận comple
 - Lưu minh chứng demo vào `demo/`: ảnh terminal hai máy, Wireshark PCAP, video 3–5 phút khi hoàn thành.
 - Không sửa tay số liệu để làm đẹp biểu đồ; giữ cả raw CSV và phương pháp tính.
 
-## 10. Làm việc nhóm / lưu ý
-
-Jira quản lý Sprint và task; GitHub lưu mã nguồn và commit. Dùng feature branch/PR khi sửa nhiều module chung, tránh push ghi đè cùng lúc. Không commit `.venv`, log, file lớn, mật khẩu hoặc dữ liệu nhạy cảm. Khi dùng AI, ghi rõ phạm vi hỗ trợ, review và kiểm thử thủ công trước khi nộp.
-
-**Tình trạng nghiệm thu:** Code có thể test loopback; nhóm **phải chạy thử trên hai máy thật** và ghi PCAP/log trước khi đánh dấu S1-06 DONE. Multi-client, CSV benchmark tự động, đồ thị và số liệu đo chính thức chưa thuộc bản sửa này.
