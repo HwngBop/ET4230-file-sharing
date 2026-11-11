@@ -177,6 +177,7 @@ python scripts/smoke_test.py --host 192.168.1.10 --port 5000 --size 10485760
 Kết quả kỳ vọng gồm `UPLOAD OK`, `LIST OK`, `DOWNLOAD OK`, `SHA-256 MATCH`, `QUIT OK`. Ghi lại kết quả màn hình, log server và Wireshark `.pcapng` khi chạy hai máy thật.
 
 <CodeBlock language="markdown" editable>
+
 ## 8. Phương pháp đo hiệu năng
 
 
