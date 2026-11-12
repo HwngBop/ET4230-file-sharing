@@ -29,7 +29,3 @@ src/server/storage/*
 .idea/
 .DS_Store
 Thumbs.db
-
-# Generated measurement fixtures / scratch
-/test_files/
-/work/
