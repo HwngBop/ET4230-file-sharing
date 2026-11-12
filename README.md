@@ -15,7 +15,7 @@ Hệ thống truyền tệp qua TCP socket, có các lệnh `UPLOAD`, `DOWNLOAD`
 | TCP application framing | JSON UTF-8 + `\n`; payload theo `file_size` |
 | Chunked file transfer | 64 KiB mặc định |
 | SHA-256 upload/download | Đã bổ sung trong bản sửa, cần nhóm kiểm tra khi tích hợp |
-| CSV logger + baseline | Đã bổ sung: UUID, CSV tự động, metadata, runner 1/10/50 MB |
+| CSV logger + benchmark | Chưa có trong bản sửa (Member 5) |
 | Multi-client đồng thời | Sprint 2 |
 | Resume / GUI / TLS | Ngoài phạm vi Sprint 1 |
 
@@ -45,7 +45,7 @@ ET4230-file-sharing/
 └── README.md
 ```
 
-`src/server/storage/`, `logs/`, `client_data/uploads/`, `client_data/downloads/` được tạo khi chạy hoặc lúc setup; không commit các tệp runtime hay tệp test lớn. `results/` chứa CSV và metadata Sprint 1; `plots/`, `demo/` dành cho các bước sau.
+`src/server/storage/`, `logs/`, `client_data/uploads/`, `client_data/downloads/` được tạo khi chạy hoặc lúc setup; không commit các tệp runtime hay tệp test lớn. Các thư mục `results/`, `plots/`, `demo/` cần bổ sung khi nhóm xây dựng benchmark và thu thập minh chứng.
 
 ## 3. Yêu cầu môi trường
 
@@ -127,7 +127,7 @@ Ví dụ một phiên dùng:
 > quit
 ```
 
-Client tìm tệp upload theo đường dẫn nhập hoặc trong `client_data/uploads/`. Tệp tải về nằm trong `client_data/downloads/`. Khi hoàn thành, Client hiển thị **SHA-256 MATCH**, transfer time và application throughput bằng **Mbps**, đồng thời tự ghi CSV.
+Client tìm tệp upload theo đường dẫn nhập hoặc trong `client_data/uploads/`. Tệp tải về nằm trong `client_data/downloads/`. Khi hoàn thành, Client hiển thị **SHA-256 MATCH**, transfer time và application throughput bằng **Mbps**.
 
 **Khuyến nghị:** chạy Client và Server ở **hai laptop/host khác nhau**, cùng mạng LAN/Wi-Fi; mở TCP port 5000 trên firewall của máy Server nếu cần. Không dùng localhost làm minh chứng mạng hai máy.
 
@@ -176,7 +176,7 @@ python scripts/smoke_test.py --host 192.168.1.10 --port 5000 --size 10485760
 
 Kết quả kỳ vọng gồm `UPLOAD OK`, `LIST OK`, `DOWNLOAD OK`, `SHA-256 MATCH`, `QUIT OK`. Ghi lại kết quả màn hình, log server và Wireshark `.pcapng` khi chạy hai máy thật.
 
-
+<CodeBlock language="markdown" editable>
 
 ## 8. Phương pháp đo hiệu năng
 
@@ -207,16 +207,3 @@ Thời gian đo phía Client được tính từ lúc bắt đầu gửi request
 - Lưu minh chứng demo vào `demo/`: ảnh terminal hai máy, Wireshark PCAP, video 3–5 phút khi hoàn thành.
 - Không sửa tay số liệu để làm đẹp biểu đồ; giữ cả raw CSV và phương pháp tính.
 
-
-## 10. Phần đo lường của Hà Nguyệt
-
-Hướng dẫn chạy Windows/Linux và thí nghiệm trên hai máy: [report/measurement-guide.md](report/measurement-guide.md).
-
-Chạy nhanh khi server localhost đã sẵn sàng và đã export metadata server:
-
-```text
-python scripts/generate_test_files.py
-python scripts/run_baseline.py --host 127.0.0.1 --port 5000 --network-type loopback --server-metadata results/server-host.json --download
-```
-
-CSV ở `results/raw/baseline.csv`; metadata gần nhất ở `results/environment.json`, bản lưu từng phiên ở `results/environments/`. Chạy localhost tạo số liệu loopback, không đại diện cho LAN/Wi-Fi giữa hai máy. Kết quả loopback đã lưu trong `results/`; mỗi lần chạy tiếp theo sẽ tạo thêm dữ liệu. Xem [kết quả kiểm chứng](results/verification.md).
