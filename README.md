@@ -15,7 +15,6 @@ Hệ thống truyền tệp qua TCP socket, có các lệnh `UPLOAD`, `DOWNLOAD`
 | TCP application framing | JSON UTF-8 + `\n`; payload theo `file_size` |
 | Chunked file transfer | 64 KiB mặc định |
 | SHA-256 upload/download | Đã bổ sung trong bản sửa, cần nhóm kiểm tra khi tích hợp |
-| CSV logger + benchmark | Chưa có trong bản sửa (Member 5) |
 | Multi-client đồng thời | Sprint 2 |
 | Resume / GUI / TLS | Ngoài phạm vi Sprint 1 |
 
