@@ -4,11 +4,12 @@ From project root: python src/client/client.py
 Commands: connect, upload, download, list, quit, help.
 """
 
+import argparse
+from contextlib import contextmanager
 import hashlib
 import re
 import socket
 import sys
-import time
 from pathlib import Path
 
 SRC_DIR = Path(__file__).resolve().parents[1]
@@ -16,6 +17,9 @@ if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
 from common.protocol import Connection, PeerDisconnected, ProtocolError  # noqa: E402
+from common.measurement import Measurement, throughput_mbps
+from common.csv_logger import append_result
+from common.environment import collect_host, save_environment
 
 PROJECT_ROOT = SRC_DIR.parent
 DOWNLOAD_DIR = PROJECT_ROOT / "client_data" / "downloads"
@@ -46,6 +50,10 @@ class ClientError(Exception):
     """A problem the user should be told about; the client keeps running."""
 
 
+class ChecksumMismatch(ClientError):
+    """A valid peer checksum differs from the local checksum."""
+
+
 class ServerError(ClientError):
     """The server answered with status = ERROR."""
 
@@ -64,7 +72,7 @@ def format_size(num_bytes):
 
 def print_result(elapsed, num_bytes):
     # Network throughput: 1 Mbps = 1,000,000 bits/s (not MB/s).
-    mbps = (num_bytes * 8 / elapsed / 1_000_000) if elapsed > 0 else 0.0
+    mbps = throughput_mbps(num_bytes, elapsed)
     print(f"Time: {elapsed:.3f} s, Application throughput: {mbps:.2f} Mbps")
 
 
@@ -81,13 +89,50 @@ def verify_checksum(value, expected):
     if not isinstance(value, str) or not re.fullmatch(r"[0-9a-fA-F]{64}", value):
         raise ClientError("Server did not return a valid SHA-256 checksum")
     if value.lower() != expected:
-        raise ClientError("CHECKSUM_MISMATCH: received file bytes differ from expected SHA-256")
+        raise ChecksumMismatch("CHECKSUM_MISMATCH: received file bytes differ from expected SHA-256")
 
 
 class FileClient:
-    def __init__(self):
+    def __init__(self, csv_path=PROJECT_ROOT / "results/raw/baseline.csv",
+                 environment_id=None, chunk_size=CHUNK_SIZE, download_dir=None,
+                 auto_environment=True, results_dir=PROJECT_ROOT / "results"):
+        if type(chunk_size) is not int or chunk_size < 1:
+            raise ValueError("chunk_size must be a positive integer")
         self.sock = None
         self.conn = None
+        self.csv_path = Path(csv_path)
+        self.environment_id = environment_id
+        self.chunk_size = chunk_size
+        self.download_dir = Path(download_dir) if download_dir else DOWNLOAD_DIR
+        self.auto_environment = auto_environment
+        self._provided_environment = environment_id is not None
+        self.results_dir = Path(results_dir)
+        self.last_result = None
+
+    @contextmanager
+    def measured_transfer(self, direction, filename):
+        measurement = Measurement(direction, str(filename), self.chunk_size, self.environment_id)
+        self.last_result = measurement.row
+        try:
+            yield measurement
+            measurement.finish()
+        except BaseException as exc:
+            # A missing/malformed checksum remains unknown, not a mismatch.
+            if isinstance(exc, ChecksumMismatch) or getattr(exc, "code", None) == "CHECKSUM_MISMATCH":
+                measurement.row["checksum_match"] = False
+            measurement.finish(exc)
+            if (measurement.transfer_start is not None
+                    and not (isinstance(exc, ServerError) and exc.code not in FATAL_ERROR_CODES)):
+                self.drop()
+            raise
+        finally:
+            try:
+                append_result(self.csv_path, measurement.row)
+            except (OSError, ValueError, TypeError) as exc:
+                raise ClientError(f"CSV LOGGING FAILED ({self.csv_path}): {exc}") from exc
+        print("Transfer completed; SHA-256 MATCH.")
+        print_result(measurement.row["transfer_time_s"], measurement.row["file_size_bytes"])
+        print(f"run_id: {measurement.row['run_id']}; CSV: {self.csv_path}")
 
     @property
     def connected(self):
@@ -109,6 +154,16 @@ class FileClient:
         sock.settimeout(SOCKET_TIMEOUT)
         self.sock = sock
         self.conn = Connection(sock)
+        try:
+            if self.auto_environment and not self._provided_environment:
+                client = collect_host("client", sock.getsockname()[0], chunk_size_bytes=self.chunk_size)
+                server = dict(role="server", ip=sock.getpeername()[0], os="unknown",
+                              python_version="unknown", cpu="unknown", ram_bytes=None,
+                              logical_cpu_count=None, network_type="unknown", chunk_size_bytes=None)
+                self.environment_id = save_environment(client, server, port, self.results_dir)
+        except (OSError, ValueError):
+            self.drop()
+            raise
         print("Connected to server.")
 
     def drop(self):
@@ -158,15 +213,21 @@ class FileClient:
                 print(f"  {name}")
 
     def upload(self, raw_path):
+        with self.measured_transfer("upload", Path(raw_path).name) as measurement:
+            self._upload(raw_path, measurement)
+        return self.last_result
+
+    def _upload(self, raw_path, measurement):
         self.require_connection()
         path = self.find_local_file(raw_path)
         file_size = path.stat().st_size
         filename = path.name
+        measurement.row.update(file_name=filename, file_size_bytes=file_size)
         source_sha256 = sha256_file(path)
         print(f"Uploading {filename}")
         print(f"Size: {format_size(file_size)}")
 
-        start = time.perf_counter()
+        measurement.start()
         self.conn.send_header({
             "command": "UPLOAD", "filename": filename,
             "file_size": file_size, "sha256": source_sha256,
@@ -176,7 +237,7 @@ class FileClient:
         sent = 0
         with open(path, "rb") as stream:
             while sent < file_size:
-                chunk = stream.read(min(CHUNK_SIZE, file_size - sent))
+                chunk = stream.read(min(self.chunk_size, file_size - sent))
                 if not chunk:
                     self.drop()
                     raise ClientError("Local file changed during upload. Connection closed.")
@@ -190,19 +251,23 @@ class FileClient:
         except ClientError:
             self.drop()
             raise
-        print("Transfer completed; SHA-256 MATCH.")
-        print_result(time.perf_counter() - start, file_size)
+        measurement.row["checksum_match"] = True
 
     def download(self, filename):
+        with self.measured_transfer("download", filename) as measurement:
+            self._download(filename, measurement)
+        return self.last_result
+
+    def _download(self, filename, measurement):
         self.require_connection()
         if not filename or Path(filename).name != filename or filename in (".", ".."):
             raise ClientError("Invalid filename: give only a file name, without a path.")
-        DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
-        target = DOWNLOAD_DIR / filename
-        partial = DOWNLOAD_DIR / (filename + ".part")
+        self.download_dir.mkdir(parents=True, exist_ok=True)
+        target = self.download_dir / filename
+        partial = self.download_dir / (filename + ".part")
 
         print(f"Downloading {filename}")
-        start = time.perf_counter()
+        measurement.start()
         self.conn.send_header({"command": "DOWNLOAD", "filename": filename})
         header = self.read_response()
         self.expect(header, "OK", "DOWNLOAD")
@@ -210,14 +275,14 @@ class FileClient:
         if type(file_size) is not int or file_size < 0:
             self.drop()
             raise ClientError("Server sent an invalid file_size. Connection closed.")
-        print(f"Size: {format_size(file_size)}")
+        measurement.row["file_size_bytes"] = file_size
 
         try:
             received = 0
             digest = hashlib.sha256()
             with open(partial, "wb") as stream:
                 while received < file_size:
-                    chunk = self.conn.receive_chunk(min(CHUNK_SIZE, file_size - received))
+                    chunk = self.conn.receive_chunk(min(self.chunk_size, file_size - received))
                     written = stream.write(chunk)
                     if written != len(chunk):
                         raise OSError("Short write while saving downloaded file")
@@ -226,14 +291,12 @@ class FileClient:
             confirmation = self.read_response()
             self.expect(confirmation, "SUCCESS", "DOWNLOAD")
             verify_checksum(confirmation.get("sha256"), digest.hexdigest())
+            measurement.row["checksum_match"] = True
             partial.replace(target)
         except BaseException:
             partial.unlink(missing_ok=True)
             raise
 
-        print("Transfer completed; SHA-256 MATCH.")
-        print(f"Saved to: {target}")
-        print_result(time.perf_counter() - start, file_size)
 
     def quit(self):
         if not self.connected:
@@ -324,9 +387,23 @@ def run_safely(client, line):
 
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--csv", type=Path, default=PROJECT_ROOT / "results/raw/baseline.csv")
+    parser.add_argument("--environment", type=Path, help="Existing merged environment JSON")
+    args = parser.parse_args()
+    environment_id = None
+    if args.environment:
+        import json
+        try:
+            document = json.loads(args.environment.read_text(encoding="utf-8"))
+            environment_id = document["environment_id"]
+            if document.get("chunk_size_bytes") != CHUNK_SIZE:
+                raise ValueError("Environment chunk_size_bytes differs from client")
+        except (OSError, ValueError, KeyError) as exc:
+            parser.error(f"Invalid environment: {exc}")
     DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    client = FileClient()
+    client = FileClient(csv_path=args.csv, environment_id=environment_id)
     print("ET4230 File Sharing Client. Type 'help' for commands.")
     try:
         while True:
