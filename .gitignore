@@ -29,3 +29,8 @@ src/server/storage/*
 .idea/
 .DS_Store
 Thumbs.db
+
+# Scratch work and generated Sprint 2 fixtures/results
+/work/
+/test_files/
+/results/sprint2/
