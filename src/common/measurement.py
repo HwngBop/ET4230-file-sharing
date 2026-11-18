@@ -15,17 +15,25 @@ def throughput_mbps(file_size_bytes, transfer_time_s):
 
 
 class Measurement:
-    def __init__(self, direction, file_name, chunk_size_bytes, environment_id=None):
+    def __init__(self, direction, file_name, chunk_size_bytes, environment_id=None,
+                 num_clients=1, client_id=None, session_id=None):
+        if type(num_clients) is not int or num_clients < 1:
+            raise ValueError("num_clients must be a positive integer")
         self.transfer_start = None
         self.transfer_end = None
         self.row = dict(
             run_id=str(uuid4()), timestamp=datetime.now(timezone.utc).isoformat(),
             direction=direction, file_name=file_name, file_size_bytes=None,
-            chunk_size_bytes=chunk_size_bytes, num_clients=1,
+            chunk_size_bytes=chunk_size_bytes, num_clients=num_clients,
             bandwidth_limit_mbps="unlimited", transfer_time_s=None,
             throughput_mbps=None, checksum_match=None, status="FAILED",
             environment_id=environment_id, error_message="",
         )
+
+        if client_id is not None:
+            self.row["client_id"] = client_id
+        if session_id is not None:
+            self.row["session_id"] = session_id
 
     def start(self):
         self.row["timestamp"] = datetime.now(timezone.utc).isoformat()

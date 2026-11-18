@@ -1,0 +1,89 @@
+{
+  "session_id": "18403f6b-0978-4196-81fb-36b28d776055",
+  "environment_id": "e53b8b62-d0d3-480f-872c-f59be033ec43",
+  "status": "PASS",
+  "num_clients": 1,
+  "expected_rows": 6,
+  "actual_rows": 6,
+  "errors": [],
+  "concurrency": {
+    "status": "PASS",
+    "applicable": false,
+    "method": "first upload: READY-to-completion overlap and all READY before first payload",
+    "all_ready_before_payload": true,
+    "shared_processing_overlap_s": 0.037414617000024464,
+    "shared_payload_completion_overlap_s": 0.03740258499999527,
+    "ready_gate_broken": false,
+    "ready_times_s": {
+      "client-01": 453.571720816
+    },
+    "payload_release_times_s": {
+      "client-01": 453.571732848
+    },
+    "clock": "perf_counter on one runner process; not comparable across hosts",
+    "note": "Demonstrates concurrent application dispatch/waiting, not parallel CPU execution or wire-level packet overlap."
+  },
+  "workers": [
+    {
+      "client_id": "client-01",
+      "session_id": "18403f6b-0978-4196-81fb-36b28d776055",
+      "status": "PASS",
+      "errors": [],
+      "expected_rows": 6,
+      "local_address": [
+        "127.0.0.1",
+        46890
+      ],
+      "server_address": [
+        "127.0.0.1",
+        44779
+      ],
+      "transfers": [
+        {
+          "run_id": "70245f78-3a00-4368-9ade-14d8ce9e5fef",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 453.569769075,
+          "transfer_end_s": 453.609135433
+        },
+        {
+          "run_id": "311ede98-7a8b-41cb-9748-a9422aa93fb1",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 453.610301761,
+          "transfer_end_s": 453.672406774
+        },
+        {
+          "run_id": "b44caba7-a2fc-4778-8474-1499afbcee8f",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 453.674032424,
+          "transfer_end_s": 453.686476915
+        },
+        {
+          "run_id": "19f9910a-d001-4c05-9c0b-2f24de9caf47",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 453.686736368,
+          "transfer_end_s": 453.689937812
+        },
+        {
+          "run_id": "f27cc0fb-a97f-44dd-9ab9-15ae4b691adb",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 453.760268868,
+          "transfer_end_s": 453.859229358
+        },
+        {
+          "run_id": "3a8d7c20-44b3-4d9f-bac2-f244347cbf9c",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 453.859615259,
+          "transfer_end_s": 453.994573125
+        }
+      ],
+      "row_count": 6,
+      "successful_transfers": 6
+    }
+  ]
+}

@@ -95,7 +95,9 @@ def verify_checksum(value, expected):
 class FileClient:
     def __init__(self, csv_path=PROJECT_ROOT / "results/raw/baseline.csv",
                  environment_id=None, chunk_size=CHUNK_SIZE, download_dir=None,
-                 auto_environment=True, results_dir=PROJECT_ROOT / "results"):
+                 auto_environment=True, results_dir=PROJECT_ROOT / "results",
+                 num_clients=1, client_id=None, session_id=None, csv_fields=None,
+                 socket_timeout=SOCKET_TIMEOUT):
         if type(chunk_size) is not int or chunk_size < 1:
             raise ValueError("chunk_size must be a positive integer")
         self.sock = None
@@ -108,10 +110,20 @@ class FileClient:
         self._provided_environment = environment_id is not None
         self.results_dir = Path(results_dir)
         self.last_result = None
+        if type(num_clients) is not int or num_clients < 1:
+            raise ValueError("num_clients must be a positive integer")
+        if not 0 < socket_timeout <= 86400:
+            raise ValueError("socket_timeout must be in (0, 86400]")
+        self.num_clients = num_clients
+        self.client_id = client_id
+        self.session_id = session_id
+        self.csv_fields = csv_fields
+        self.socket_timeout = socket_timeout
 
     @contextmanager
     def measured_transfer(self, direction, filename):
-        measurement = Measurement(direction, str(filename), self.chunk_size, self.environment_id)
+        measurement = Measurement(direction, str(filename), self.chunk_size, self.environment_id,
+                                  self.num_clients, self.client_id, self.session_id)
         self.last_result = measurement.row
         try:
             yield measurement
@@ -127,7 +139,7 @@ class FileClient:
             raise
         finally:
             try:
-                append_result(self.csv_path, measurement.row)
+                append_result(self.csv_path, measurement.row, fields=self.csv_fields)
             except (OSError, ValueError, TypeError) as exc:
                 raise ClientError(f"CSV LOGGING FAILED ({self.csv_path}): {exc}") from exc
         print("Transfer completed; SHA-256 MATCH.")
@@ -142,7 +154,7 @@ class FileClient:
         if self.connected:
             raise ClientError("Already connected. Use 'quit' to disconnect first.")
         try:
-            sock = socket.create_connection((host, port), timeout=SOCKET_TIMEOUT)
+            sock = socket.create_connection((host, port), timeout=self.socket_timeout)
         except socket.gaierror:
             raise ClientError(f"Invalid or unknown server address: {host}")
         except socket.timeout:
@@ -151,7 +163,7 @@ class FileClient:
             raise ClientError(f"Server not reachable: {host}:{port} refused the connection")
         except OSError as exc:
             raise ClientError(f"Server not reachable: {exc}")
-        sock.settimeout(SOCKET_TIMEOUT)
+        sock.settimeout(self.socket_timeout)
         self.sock = sock
         self.conn = Connection(sock)
         try:
