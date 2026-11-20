@@ -1,5 +1,6 @@
 """A bounded thread-per-connection TCP server supporting concurrent clients."""
 
+from contextlib import contextmanager
 import hashlib
 import logging
 import os
@@ -207,9 +208,17 @@ class FileServer:
         for worker in workers:
             if worker is not current and worker.is_alive():
                 worker.join(timeout=5.0)
-        with self._lock:
-            self._active_clients.clear()
-            self._workers.clear()
+
+    @contextmanager
+    def _acquire_file_lock(self, filename):
+        try_lock_file = getattr(self.storage, "try_lock_file", None)
+        if try_lock_file is None:
+            yield
+            return
+        with try_lock_file(filename) as acquired:
+            if not acquired:
+                raise ProtocolError("FILE_BUSY", "File is currently in use", fatal=False)
+            yield
 
     def _log(self, context, status, message):
         self.logger.info(
@@ -292,68 +301,71 @@ class FileServer:
         ):
             raise ProtocolError("INVALID_CHECKSUM", "sha256 must be 64 hexadecimal characters")
 
-        temporary_path = None
-        context["transferred_bytes"] = 0
-        digest = hashlib.sha256()
-        try:
-            with self.storage.create_upload() as stream:
-                temporary_path = Path(stream.name)
-                connection.send_header({"status": "READY", "command": "UPLOAD", "filename": target.name, "file_size": file_size})
-                remaining = file_size
-                while remaining:
-                    chunk = connection.receive_chunk(min(remaining, self.config.chunk_size))
-                    written = stream.write(chunk)
-                    if written != len(chunk):
-                        raise OSError("Short write while saving uploaded file")
-                    digest.update(chunk)
-                    remaining -= written
-                    context["transferred_bytes"] += written
-                stream.flush()
-                if stream.tell() != file_size:
-                    raise ProtocolError("TRANSFER_INCOMPLETE", "Uploaded byte count does not match metadata", fatal=True)
+        with self._acquire_file_lock(target.name):
+            temporary_path = None
+            context["transferred_bytes"] = 0
+            digest = hashlib.sha256()
+            try:
+                with self.storage.create_upload() as stream:
+                    temporary_path = Path(stream.name)
+                    connection.send_header({"status": "READY", "command": "UPLOAD", "filename": target.name, "file_size": file_size})
+                    remaining = file_size
+                    while remaining:
+                        chunk = connection.receive_chunk(min(remaining, self.config.chunk_size))
+                        written = stream.write(chunk)
+                        if written != len(chunk):
+                            raise OSError("Short write while saving uploaded file")
+                        digest.update(chunk)
+                        remaining -= written
+                        context["transferred_bytes"] += written
+                    stream.flush()
+                    if stream.tell() != file_size:
+                        raise ProtocolError("TRANSFER_INCOMPLETE", "Uploaded byte count does not match metadata", fatal=True)
 
-            actual_sha256 = digest.hexdigest()
-            context["sha256"] = actual_sha256
-            if expected_sha256 is not None and actual_sha256 != expected_sha256.lower():
-                # Do not publish the temporary upload or overwrite an existing file.
-                raise ProtocolError("CHECKSUM_MISMATCH", "Uploaded SHA-256 does not match source checksum")
-            self.storage.commit_upload(temporary_path, target)
-            connection.send_header({
-                "status": "SUCCESS", "command": "UPLOAD", "filename": target.name,
-                "file_size": file_size, "sha256": actual_sha256,
-            })
-        finally:
-            if temporary_path is not None:
-                temporary_path.unlink(missing_ok=True)
+                actual_sha256 = digest.hexdigest()
+                context["sha256"] = actual_sha256
+                if expected_sha256 is not None and actual_sha256 != expected_sha256.lower():
+                    # Do not publish the temporary upload or overwrite an existing file.
+                    raise ProtocolError("CHECKSUM_MISMATCH", "Uploaded SHA-256 does not match source checksum")
+                self.storage.commit_upload(temporary_path, target)
+                connection.send_header({
+                    "status": "SUCCESS", "command": "UPLOAD", "filename": target.name,
+                    "file_size": file_size, "sha256": actual_sha256,
+                })
+            finally:
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
 
     def _download(self, connection, request, context):
-        with self.storage.open_download(request.get("filename")) as stream:
-            file_size = os.fstat(stream.fileno()).st_size
-            context["file_size"] = file_size
-            context["transferred_bytes"] = 0
-            connection.send_header({
-                "status": "OK", "command": "DOWNLOAD",
-                "filename": request["filename"], "file_size": file_size,
-            })
-            connection.sending_payload = True
-            digest = hashlib.sha256()
-            remaining = file_size
-            while remaining:
-                chunk = stream.read(min(remaining, self.config.chunk_size))
-                if not chunk:
-                    raise PeerDisconnected("Download source changed before all file bytes were sent")
-                connection.sock.sendall(chunk)
-                digest.update(chunk)
-                remaining -= len(chunk)
-                context["transferred_bytes"] += len(chunk)
-            connection.sending_payload = False
-            actual_sha256 = digest.hexdigest()
-            context["sha256"] = actual_sha256
-            connection.send_header({
-                "status": "SUCCESS", "command": "DOWNLOAD",
-                "filename": request["filename"], "file_size": file_size,
-                "sha256": actual_sha256,
-            })
+        target = self.storage.path_for(request.get("filename"))
+        with self._acquire_file_lock(target.name):
+            with self.storage.open_download(target.name) as stream:
+                file_size = os.fstat(stream.fileno()).st_size
+                context["file_size"] = file_size
+                context["transferred_bytes"] = 0
+                connection.send_header({
+                    "status": "OK", "command": "DOWNLOAD",
+                    "filename": request["filename"], "file_size": file_size,
+                })
+                connection.sending_payload = True
+                digest = hashlib.sha256()
+                remaining = file_size
+                while remaining:
+                    chunk = stream.read(min(remaining, self.config.chunk_size))
+                    if not chunk:
+                        raise PeerDisconnected("Download source changed before all file bytes were sent")
+                    connection.sock.sendall(chunk)
+                    digest.update(chunk)
+                    remaining -= len(chunk)
+                    context["transferred_bytes"] += len(chunk)
+                connection.sending_payload = False
+                actual_sha256 = digest.hexdigest()
+                context["sha256"] = actual_sha256
+                connection.send_header({
+                    "status": "SUCCESS", "command": "DOWNLOAD",
+                    "filename": request["filename"], "file_size": file_size,
+                    "sha256": actual_sha256,
+                })
 
 
 def main(argv=None):

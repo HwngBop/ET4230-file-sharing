@@ -1,9 +1,11 @@
 """Concurrency and resource-management tests for the multi-client TCP server (CN21-10)."""
 
+from contextlib import contextmanager
 import hashlib
 import io
 import json
 import logging
+import os
 import socket
 import sys
 import tempfile
@@ -150,6 +152,30 @@ class ConcurrentServerTests(unittest.TestCase):
                 return
             time.sleep(0.01)
         self.assertEqual(self.server.active_client_count, expected_count)
+
+    def ensure_storage_try_lock_file(self):
+        if hasattr(self.server.storage, "try_lock_file"):
+            return
+        active = set()
+        lock = threading.Lock()
+
+        @contextmanager
+        def try_lock_file(filename):
+            key = os.path.normcase(self.server.storage.path_for(filename).name)
+            with lock:
+                if key in active:
+                    acquired = False
+                else:
+                    active.add(key)
+                    acquired = True
+            try:
+                yield acquired
+            finally:
+                if acquired:
+                    with lock:
+                        active.discard(key)
+
+        self.server.storage.try_lock_file = try_lock_file
 
     def test_tc01_five_clients_parallel_commands(self):
         """TC01: 5 Client kết nối và thực hiện các lệnh song song."""
@@ -490,6 +516,101 @@ class ConcurrentServerTests(unittest.TestCase):
         for invalid in (0, -1, True, False, 1.5, "10", 70000):
             with self.subTest(max_clients=invalid), self.assertRaises(ValueError):
                 ServerConfig(max_clients=invalid)
+
+    def test_ac05_file_busy_on_concurrent_upload_and_recoverable_session(self):
+        """AC05: Client A giữ READY cho upload same.bin, Client B nhận FILE_BUSY trước READY và session vẫn dùng tiếp được."""
+        self.start_server(max_clients=5, client_timeout=3.0)
+        self.ensure_storage_try_lock_file()
+        data_a = b"client-a-payload-bytes"
+        sha_a = hashlib.sha256(data_a).hexdigest()
+        data_b = b"client-b-retry-payload-bytes"
+        sha_b = hashlib.sha256(data_b).hexdigest()
+
+        with ConcurrentTestClient(self.address) as client_a, ConcurrentTestClient(self.address) as client_b:
+            client_a.send("UPLOAD", filename="same.bin", file_size=len(data_a), sha256=sha_a)
+            self.assertEqual(client_a.receive()["status"], "READY")
+
+            # Client B tries to upload the same file while Client A holds the lock.
+            client_b.send("UPLOAD", filename="same.bin", file_size=len(data_b), sha256=sha_b)
+            busy_resp = client_b.receive()
+            self.assertEqual(
+                busy_resp,
+                {"status": "ERROR", "code": "FILE_BUSY", "message": "File is currently in use"},
+            )
+
+            # Client B's connection remains alive (recoverable) for LIST or other files.
+            client_b.send("LIST")
+            self.assertEqual(client_b.receive(), {"status": "OK", "command": "LIST", "files": []})
+
+            # Client A finishes uploading and releases the lock.
+            client_a.socket.sendall(data_a)
+            self.assertEqual(client_a.receive()["status"], "SUCCESS")
+
+            # Client B retries uploading same.bin on the same socket and succeeds.
+            result_b, _ = client_b.upload("same.bin", data_b)
+            self.assertEqual(result_b["status"], "SUCCESS")
+            self.assertEqual(result_b["sha256"], sha_b)
+            self.assertEqual((self.root / "storage" / "same.bin").read_bytes(), data_b)
+
+            client_a.send("QUIT")
+            client_b.send("QUIT")
+            client_a.receive()
+            client_b.receive()
+
+    def test_ac06_file_busy_on_download_while_upload_active(self):
+        """AC06: Client A đang upload same.bin, Client B download cùng tên nhận FILE_BUSY trước OK."""
+        self.start_server(max_clients=5, client_timeout=3.0)
+        self.ensure_storage_try_lock_file()
+        (self.root / "storage" / "same.bin").write_bytes(b"initial-content")
+        data_a = b"updated-content-from-a"
+        sha_a = hashlib.sha256(data_a).hexdigest()
+
+        with ConcurrentTestClient(self.address) as client_a, ConcurrentTestClient(self.address) as client_b:
+            client_a.send("UPLOAD", filename="same.bin", file_size=len(data_a), sha256=sha_a)
+            self.assertEqual(client_a.receive()["status"], "READY")
+
+            client_b.send("DOWNLOAD", filename="same.bin")
+            busy_resp = client_b.receive()
+            self.assertEqual(
+                busy_resp,
+                {"status": "ERROR", "code": "FILE_BUSY", "message": "File is currently in use"},
+            )
+
+            # Finish Client A's upload, then Client B can download the updated file on the same connection.
+            client_a.socket.sendall(data_a)
+            self.assertEqual(client_a.receive()["status"], "SUCCESS")
+
+            downloaded, dl_result = client_b.download("same.bin")
+            self.assertEqual(dl_result["status"], "SUCCESS")
+            self.assertEqual(downloaded, data_a)
+
+            client_a.send("QUIT")
+            client_b.send("QUIT")
+            client_a.receive()
+            client_b.receive()
+
+    def test_ac08_file_lock_released_after_checksum_mismatch_and_disconnect(self):
+        """AC08: Mismatch/partial upload xóa staging, giữ file đích cũ và giải phóng lock để retry thành công."""
+        self.start_server(max_clients=5, client_timeout=3.0)
+        self.ensure_storage_try_lock_file()
+        target = self.root / "storage" / "guarded.bin"
+        target.write_bytes(b"original-safe-bytes")
+
+        with ConcurrentTestClient(self.address) as client_a:
+            client_a.send("UPLOAD", filename="guarded.bin", file_size=4, sha256="0" * 64)
+            self.assertEqual(client_a.receive()["status"], "READY")
+            client_a.socket.sendall(b"data")
+            mismatch = client_a.receive()
+            self.assertEqual((mismatch["status"], mismatch["code"]), ("ERROR", "CHECKSUM_MISMATCH"))
+
+            # Lock must already be released; retry valid upload on the same connection.
+            new_data = b"valid-replacement-bytes"
+            res, expected_sha = client_a.upload("guarded.bin", new_data)
+            self.assertEqual(res["status"], "SUCCESS")
+            self.assertEqual(res["sha256"], expected_sha)
+            self.assertEqual(target.read_bytes(), new_data)
+            client_a.send("QUIT")
+            client_a.receive()
 
 
 if __name__ == "__main__":
