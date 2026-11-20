@@ -155,7 +155,7 @@ class ConcurrentServerTests(unittest.TestCase):
         """TC01: 5 Client kết nối và thực hiện các lệnh song song."""
         self.start_server(max_clients=10, client_timeout=5.0)
         num_clients = 5
-        connect_barrier = threading.Barrier(num_clients, timeout=5.0)
+        ready_barrier = threading.Barrier(num_clients, timeout=5.0)
         command_barrier = threading.Barrier(num_clients, timeout=5.0)
         errors = []
         active_at_barrier = []
@@ -163,11 +163,25 @@ class ConcurrentServerTests(unittest.TestCase):
         def worker(index):
             try:
                 payload = f"parallel-client-{index}-".encode("utf-8") * 1024
+                expected_sha = hashlib.sha256(payload).hexdigest()
                 filename = f"tc01_client_{index}.bin"
                 with ConcurrentTestClient(self.address) as client:
-                    connect_barrier.wait()
+                    client.send(
+                        "UPLOAD",
+                        filename=filename,
+                        file_size=len(payload),
+                        sha256=expected_sha,
+                    )
+                    ready = client.receive()
+                    self.assertEqual(ready["status"], "READY")
+
+                    # All 5 workers must have accepted and dispatched READY concurrently
+                    # before any client transmits payload bytes.
+                    ready_barrier.wait()
                     active_at_barrier.append(self.server.active_client_count)
-                    result, expected_sha = client.upload(filename, payload, chunk_size=2048)
+
+                    client.socket.sendall(payload)
+                    result = client.receive()
                     self.assertEqual(result["status"], "SUCCESS")
                     self.assertEqual(result["sha256"], expected_sha)
 
@@ -197,7 +211,7 @@ class ConcurrentServerTests(unittest.TestCase):
             self.assertFalse(thread.is_alive(), "Client worker thread hung")
 
         self.assertEqual(errors, [])
-        self.assertTrue(all(count == num_clients for count in active_at_barrier))
+        self.assertEqual(active_at_barrier, [num_clients] * num_clients)
 
     def test_tc02_idle_and_timeout_client_does_not_block_other_clients(self):
         """TC02: Client A đang idle, Client B vẫn thực hiện LIST và UPLOAD thành công."""
