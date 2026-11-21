@@ -267,14 +267,13 @@ Có thể dùng `python -m pytest -q` sau khi cài pytest. Test tạo dữ liệ
 | Server metadata IP/chunk không khớp | Export lại trên đúng máy server theo cấu hình đang chạy |
 | Port đang được dùng | Dừng server cũ do mình chạy hoặc chọn port khác ở cả server/client và metadata |
 
-## 9. Kịch bản demo và lời trình bày
+## 9. Kịch bản kiểm chứng
 
-1. Mở file nhiệm vụ và chỉ ra các script/helper mình phụ trách.
-2. Chạy generator, chỉ ba kích thước byte.
-3. Chạy server ở terminal 1, baseline ở terminal 2.
-4. Chỉ SHA-256 MATCH và run_id trên màn hình.
-5. Mở CSV, chỉ 3 hoặc 6 dòng mới, UUID, time, Mbps, checksum, SUCCESS.
-6. Mở metadata đúng UUID; giải thích loopback hay hai máy thực tế.
-7. Khi cần minh họa FAILED, dùng client tương tác tải file chắc chắn không tồn tại vào CSV demo riêng, giữ baseline thành công gốc.
+1. Chạy generator và xác nhận số byte từng file.
+2. Export metadata trên đúng máy server, khởi động server.
+3. Chạy baseline trên client và kiểm tra SHA-256 MATCH.
+4. Đối chiếu UUID, thời gian, throughput và status trong CSV.
+5. Mở metadata đúng environment_id, xác định loopback hay LAN thực tế.
+6. Giữ CSV, log và chứng cứ mạng cùng revision code để tái lập.
 
-Có thể trình bày: “Em bổ sung công cụ tạo dữ liệu, đo và lưu kết quả cho chương trình truyền file của nhóm. Mỗi lần truyền có UUID và thông tin môi trường. Em dùng perf_counter đo từ trước request đến khi nhận completion và kiểm tra checksum xong. Tốc độ tính bằng số byte nhân 8 chia thời gian và một triệu, đơn vị Mbps. CSV được ghi tự động, giữ cả lỗi. Baseline hiện tại dùng một client và buffer 64 KiB. Nếu chạy localhost, em ghi rõ đó là loopback và cần đo lại trên hai máy để đánh giá mạng LAN.”
+Thời gian đo từ trước request đến completion và kiểm tra checksum xong. Throughput tính bằng số byte nhân 8 chia thời gian và một triệu, đơn vị Mbps. CSV được ghi tự động, giữ cả lỗi. Baseline Sprint 1 dùng một client và buffer 64 KiB; kết quả localhost không đại diện cho LAN giữa hai máy.

@@ -1,0 +1,67 @@
+{
+  "environment_id": "d17c428f-2a59-4f21-8702-407af3e603e5",
+  "session_id": "3d55079a-bb91-47bd-aabd-1ef622430da8",
+  "collected_at": "2026-11-21T14:22:28.390396+00:00",
+  "client": {
+    "role": "client",
+    "collected_at": "2026-11-21T14:22:28.414101+00:00",
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "python_version": "3.12.14",
+    "ip": "127.0.0.1",
+    "network_type": "loopback",
+    "chunk_size_bytes": 65536,
+    "commit_sha": "ef00dc8a189368cab8f4d2a86ec7cd51034b03f4",
+    "working_tree_dirty": true
+  },
+  "server": {
+    "role": "server",
+    "collected_at": "2026-11-21T14:22:28.213686+00:00",
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "python_version": "3.12.14",
+    "ip": "127.0.0.1",
+    "network_type": "loopback",
+    "chunk_size_bytes": 65536,
+    "commit_sha": "a07b9503bb8d942cd16c3b1895ba06f1ecbff88d",
+    "working_tree_dirty": false,
+    "max_clients": 10
+  },
+  "num_clients": 1,
+  "host": "127.0.0.1",
+  "port": 35453,
+  "chunk_size_bytes": 65536,
+  "bandwidth_limit_mbps": "unlimited",
+  "bytes_per_MB": 1000000,
+  "timing_method": "Sprint 1 request-to-completion timing; first upload INCLUDES READY gate wait. Not an unmodified Sprint 1 performance baseline.",
+  "concurrency_method": "All first-upload READY replies before payload release; READY-to-completion intervals must overlap.",
+  "timeout_s": 30,
+  "sync_timeout_s": 5,
+  "same_host": true,
+  "server_metadata_complete": true,
+  "source_sha256": {
+    "scripts/run_concurrent.py": "d7dbeeacd1f0bf2d961f9619f77772c3f50e98bc728936455f7d7df33e22544e",
+    "src/client/client.py": "4a92ebd87766a826a699cb9de4044ac3bd7fcf89307ad675c48ae216abc62257",
+    "src/common/measurement.py": "c956ee05093f04c0e8de8d719acbad506ea37cfaa8fb8485b340949eae3d6e9c",
+    "src/common/csv_logger.py": "552c30e70e8d7e162b3dda5aa25ff2caf7f4cc26c65c6fae19cd4b8bac742dd8"
+  },
+  "source_files": [
+    {
+      "file_name": "test_10MB.bin",
+      "file_size_bytes": 10000000
+    },
+    {
+      "file_name": "test_1MB.bin",
+      "file_size_bytes": 1000000
+    },
+    {
+      "file_name": "test_50MB.bin",
+      "file_size_bytes": 50000000
+    }
+  ],
+  "client_socket_addresses": [
+    [
+      "127.0.0.1",
+      50904
+    ]
+  ],
+  "public_sample_note": "Hardware identifiers omitted from this public copy; original run metadata remains in the local session. Loopback addresses and original timings retained."
+}

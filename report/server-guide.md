@@ -1,5 +1,7 @@
 # Hướng dẫn TCP Server — Sprint 1
 
+Tài liệu này mô tả server tuần tự đi kèm nhánh `ha-nguyet`. Server concurrent từ `cn21-10` phải chạy trong thư mục riêng; xem [README](../README.md) cho quy trình Windows 1/5/10 client. SHA-256 đã được hỗ trợ trong protocol hiện tại.
+
 ## Cấu trúc và phạm vi
 
 Code tuân theo cấu trúc trong README:
@@ -19,21 +21,18 @@ Code tuân theo cấu trúc trong README:
 
 Sprint 1 tập trung vào tính đúng: server phục vụ một client tại một thời điểm.
 Client hiện tại cần đóng kết nối, gửi `QUIT` hoặc hết timeout để server xử lý
-client tiếp theo. Multi-client, SHA-256 trong protocol, benchmark, tài khoản,
+client tiếp theo. Multi-client, tài khoản,
 authentication, resume và TLS chưa thuộc phần triển khai Sprint 1.
 
 ## Cài đặt
 
-Python mục tiêu **3.11.x**, được ghi trong `.python-version`. Code tương thích
-Python 3.11 trở lên. Giữ nguyên dependency của `requirements.txt`;
-`pyproject.toml` cũng lấy dependency từ file này.
+Python mục tiêu **3.11.x**. Repo hiện không có `.python-version` hoặc `pyproject.toml`; không chạy cài editable. Xem requirements.txt cho các gói kiểm thử/báo cáo tùy chọn.
 
 Chạy từ thư mục gốc repository. Trên Windows PowerShell:
 
 ```powershell
 py -3.11 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
-.\.venv\Scripts\python.exe -m pip install -e . --no-deps
 ```
 
 Trên Linux/macOS:
@@ -41,10 +40,9 @@ Trên Linux/macOS:
 ```bash
 python3.11 -m venv .venv
 .venv/bin/python -m pip install -r requirements.txt
-.venv/bin/python -m pip install -e . --no-deps
 ```
 
-Cài editable (`-e .`) giúp Python tìm thấy package trong `src/`. Server chỉ dùng
+Đặt `PYTHONPATH=src` để tìm package server. Server chỉ dùng
 thư viện chuẩn; pytest phục vụ kiểm thử, còn pandas, matplotlib và psutil dành
 cho benchmark và báo cáo của dự án.
 
@@ -53,9 +51,12 @@ Các lệnh tiếp theo dùng `python` của môi trường ảo. Trên Windows 
 
 ## Chạy server
 
-```bash
-python -m server --host 0.0.0.0 --port 5000
+```bat
+set PYTHONPATH=src
+py -3.11 -m server --host 0.0.0.0 --port 5000
 ```
+
+Đoạn trên dùng cmd Windows. Với PowerShell dùng `$env:PYTHONPATH="src"`; Linux dùng `PYTHONPATH=src python -m server --host 0.0.0.0 --port 5000`.
 
 Entry point nằm trong `src/server/`, không thêm file code ở thư mục gốc.
 Có thể dùng `python -m server.server` với cùng tham số.

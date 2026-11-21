@@ -33,3 +33,6 @@ Thumbs.db
 # Generated measurement fixtures / scratch
 /test_files/
 /work/
+
+# Generated multi-client fixtures and runtime sessions
+/results/sprint2/
