@@ -12,6 +12,7 @@ import socket
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -277,6 +278,7 @@ class UploadTests(ClientTestCase):
         self.assertEqual(row["status"], "FAILED")
         self.assertEqual(row["throughput_mbps"], "")
         self.assertNotEqual(row["error_message"], "")
+        self.assertRegex(row["error_message"], r"^(CONNECTION_OR_IO_ERROR|TIMEOUT):")
 
     def test_connection_lost_before_confirmation_is_unverified(self):
         def handler(sock, conn):
@@ -356,6 +358,7 @@ class DownloadTests(ClientTestCase):
         row, = self.rows()
         self.assertEqual(row["status"], "FAILED")
         self.assertEqual(row["throughput_mbps"], "")
+        self.assertIn("CONNECTION_OR_IO_ERROR", row["error_message"])
 
     def test_tc05_checksum_mismatch_does_not_overwrite_old_file(self):
         self.downloads.mkdir()
@@ -553,6 +556,151 @@ class ListQuitTests(ClientTestCase):
         self.client = FileClient(csv_path=self.csv_path, environment_id="e", auto_environment=False)
         self.assertIn("Invalid command", self.run_command("frobnicate"))
         self.assertFalse(handle_command(self.client, "quit"))
+
+
+class ErrorContractTests(ClientTestCase):
+    """S2-01 additions: D03 (SERVER_BUSY right after accept), strict no-payload, error codes."""
+
+    def test_server_busy_sent_right_after_accept_before_any_command(self):
+        def busy(sock, conn):  # D03: do not read a command; send SERVER_BUSY and close
+            conn.send_header({"status": "ERROR", "code": "SERVER_BUSY",
+                              "message": "Server has reached max_clients limit"})
+
+        client = self.start(busy)
+        started = time.monotonic()
+        self.connect()  # must not block waiting for a greeting
+        self.assertLess(time.monotonic() - started, 2)
+        self.assertTrue(client.connected)  # TCP established; the refusal arrives with the first command
+        out = self.run_command("list")
+        # On Windows the close may surface as a reset instead of the JSON error frame.
+        self.assertTrue("SERVER_BUSY" in out or "CONNECTION_OR_IO_ERROR" in out, out)
+        self.assertFalse(client.connected)
+
+    def test_reconnect_after_server_busy(self):
+        def busy(sock, conn):
+            conn.send_header({"status": "ERROR", "code": "SERVER_BUSY", "message": "full"})
+
+        def healthy(sock, conn):
+            conn.receive_header()
+            conn.send_header({"status": "OK", "command": "LIST", "files": ["ok.txt"]})
+
+        client = self.start(busy, healthy)
+        self.connect()
+        self.run_command("list")
+        self.assertFalse(client.connected)
+        self.connect()  # manual reconnect = brand-new session
+        self.assertTrue(client.connected)
+        self.assertIn("ok.txt", self.run_command("list"))
+
+    def test_server_busy_on_upload_after_accept_sends_no_payload(self):
+        def busy(sock, conn):
+            conn.send_header({"status": "ERROR", "code": "SERVER_BUSY", "message": "full"})
+            sock.settimeout(1)
+            try:
+                data = sock.recv(65536)  # the UPLOAD header may arrive; payload must not
+            except OSError:
+                return
+            if len(data) > 4096:
+                raise AssertionError("payload leaked after SERVER_BUSY")
+
+        client = self.start(busy)
+        self.connect()
+        path = self.local_file("big.bin", b"x" * (2 * 1024 * 1024))
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            try:
+                client.upload(str(path))
+            except (ServerError, ClientError, OSError):
+                pass
+        self.assertFalse(client.connected)
+        self.assertNotIn("SHA-256 MATCH", out.getvalue())
+        self.assertEqual(self.rows()[0]["status"], "FAILED")
+
+    def test_file_busy_no_bytes_follow_the_upload_header(self):
+        """Strict TC02: after FILE_BUSY nothing but the next command reaches the server."""
+        upload_returned = threading.Event()
+        checked = threading.Event()  # server finished inspecting; only now may the client send LIST
+        leaked = {}
+
+        def handler(sock, conn):
+            conn.receive_header()
+            conn.send_header({"status": "ERROR", "code": "FILE_BUSY", "message": "File is currently in use"})
+            if not upload_returned.wait(5):
+                raise AssertionError("client.upload never returned")
+            leaked["buffered"] = bytes(conn.buffer)  # bytes read together with the header
+            sock.settimeout(0.3)
+            try:
+                leaked["socket"] = sock.recv(65536)  # client has not sent LIST yet: must time out
+            except socket.timeout:
+                leaked["socket"] = b""
+            checked.set()
+            sock.settimeout(5)
+            self.assertEqual(conn.receive_header(), {"command": "LIST"})
+            conn.send_header({"status": "OK", "command": "LIST", "files": []})
+
+        client = self.start(handler)
+        self.connect()
+        path = self.local_file("busy.bin", b"PAYLOAD" * 1000)
+        with contextlib.redirect_stdout(io.StringIO()):
+            try:
+                with self.assertRaises(ServerError):
+                    client.upload(str(path))
+            finally:
+                upload_returned.set()
+            self.assertTrue(client.connected)
+            self.assertTrue(checked.wait(5))
+            client.list_files()
+        self.assertEqual(leaked, {"buffered": b"", "socket": b""})
+
+    def test_silent_server_is_reported_as_timeout(self):
+        release = threading.Event()
+        client = self.start(lambda sock, conn: (conn.receive_header(), release.wait(5)))
+        self.connect()
+        client.sock.settimeout(0.3)
+        try:
+            out = self.run_command("list")
+        finally:
+            release.set()
+        self.assertIn("TIMEOUT", out)
+        self.assertFalse(client.connected)
+
+    def test_download_stalled_is_timeout_cleans_part_and_logs_code(self):
+        release = threading.Event()
+        data = b"z" * 10000
+
+        def handler(sock, conn):
+            header = conn.receive_header()
+            conn.send_header({"status": "OK", "command": "DOWNLOAD",
+                              "filename": header["filename"], "file_size": len(data)})
+            sock.sendall(data[:1000])
+            release.wait(5)  # stall: neither more bytes nor close
+
+        self.downloads.mkdir()
+        (self.downloads / "d.bin").write_bytes(b"GOOD OLD FILE")
+        client = self.start(handler)
+        self.connect()
+        client.sock.settimeout(0.3)
+        try:
+            with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(TransferInterrupted) as ctx:
+                client.download("d.bin")
+        finally:
+            release.set()
+        self.assertIn("TIMEOUT", str(ctx.exception))
+        self.assertFalse((self.downloads / "d.bin.part").exists())
+        self.assertEqual((self.downloads / "d.bin").read_bytes(), b"GOOD OLD FILE")
+        self.assertFalse(client.connected)
+        row, = self.rows()
+        self.assertEqual(row["status"], "FAILED")
+        self.assertTrue(row["error_message"].startswith("TIMEOUT"))
+        self.assertEqual(row["throughput_mbps"], "")
+
+    def test_server_closes_silently_is_connection_or_io_error(self):
+        client = self.start(lambda sock, conn: conn.receive_header())
+        self.connect()
+        out = self.run_command("list")
+        self.assertIn("CONNECTION_OR_IO_ERROR", out)
+        self.assertIn("connect", out)
+        self.assertFalse(client.connected)
 
 
 if __name__ == "__main__":

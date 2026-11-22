@@ -131,6 +131,20 @@ def verify_checksum(value, expected):
         raise ChecksumMismatch("CHECKSUM_MISMATCH: received file bytes differ from expected SHA-256")
 
 
+def io_error_code(exc):
+    """Error-contract code for a socket/IO failure detected by the CLIENT itself."""
+    return "TIMEOUT" if isinstance(exc, socket.timeout) else "CONNECTION_OR_IO_ERROR"
+
+
+def label_error(exc):
+    """Human/CSV text that always starts with the contract code for local failures."""
+    if isinstance(exc, socket.timeout):
+        return f"TIMEOUT: no response from server within {SOCKET_TIMEOUT} s"
+    if isinstance(exc, (PeerDisconnected, OSError)):
+        return f"CONNECTION_OR_IO_ERROR: {exc}"
+    return str(exc) or type(exc).__name__
+
+
 class FileClient:
     def __init__(self, csv_path=PROJECT_ROOT / "results/raw/baseline.csv",
                  environment_id=None, chunk_size=CHUNK_SIZE, download_dir=None,
@@ -174,7 +188,7 @@ class FileClient:
                 # A missing/malformed checksum remains unknown, not a mismatch.
                 if isinstance(exc, ChecksumMismatch) or getattr(exc, "code", None) == "CHECKSUM_MISMATCH":
                     measurement.row["checksum_match"] = False
-                measurement.finish(exc)
+                measurement.finish(exc if isinstance(exc, (ClientError, ProtocolError)) else label_error(exc))
                 if (measurement.transfer_start is not None
                         and not (isinstance(exc, ServerError) and exc.recoverable)):
                     self.drop()
@@ -351,7 +365,7 @@ class FileClient:
                 except OSError as exc:
                     self.drop()
                     raise TransferInterrupted(
-                        f"Connection lost during upload after {sent} of {file_size} bytes ({exc}). "
+                        f"{io_error_code(exc)}: connection lost during upload after {sent} of {file_size} bytes ({exc}). "
                         "Transfer FAILED.") from exc
                 sent += len(chunk)
 
@@ -360,7 +374,7 @@ class FileClient:
             except (PeerDisconnected, OSError) as exc:
                 self.drop()
                 raise TransferInterrupted(
-                    f"Connection lost before the server confirmed the upload ({exc}). "
+                    f"{io_error_code(exc)}: connection lost before the server confirmed the upload ({exc}). "
                     "Transfer FAILED: the result is unverified.") from exc
         self.expect(confirmation, "SUCCESS", "UPLOAD")
         try:
@@ -404,7 +418,7 @@ class FileClient:
                     except (PeerDisconnected, OSError) as exc:
                         self.drop()
                         raise TransferInterrupted(
-                            f"Connection lost during download after {received} of {file_size} bytes ({exc}). "
+                            f"{io_error_code(exc)}: connection lost during download after {received} of {file_size} bytes ({exc}). "
                             "Transfer FAILED; partial data discarded.") from exc
                     written = stream.write(chunk)
                     if written != len(chunk):
@@ -416,7 +430,7 @@ class FileClient:
             except (PeerDisconnected, OSError) as exc:
                 self.drop()
                 raise TransferInterrupted(
-                    f"Connection lost before the server confirmed the download ({exc}). "
+                    f"{io_error_code(exc)}: connection lost before the server confirmed the download ({exc}). "
                     "Transfer FAILED; partial data discarded.") from exc
             self.expect(confirmation, "SUCCESS", "DOWNLOAD")
             # Publish only after: all bytes received + SUCCESS + checksum verified.
@@ -508,18 +522,18 @@ def run_safely(client, line):
         print(f"Error: {exc}")
     except ClientError as exc:
         print(f"Error: {exc}")
-    except socket.timeout:
+    except socket.timeout as exc:
         client.drop()
-        print("Error: Server did not respond in time. Connection closed.")
+        print(f"Error: {label_error(exc)}. Connection closed; use 'connect' to reconnect.")
     except PeerDisconnected as exc:
         client.drop()
-        print(f"Error: {exc}. Connection closed.")
+        print(f"Error: {label_error(exc)}. Connection closed; use 'connect' to reconnect.")
     except ProtocolError as exc:
         client.drop()
         print(f"Error: Protocol violation from server ({exc}). Connection closed.")
     except OSError as exc:
         client.drop()
-        print(f"Error: Connection or file problem ({exc}). Connection closed.")
+        print(f"Error: {label_error(exc)}. Connection closed; use 'connect' to reconnect.")
     return True
 
 
