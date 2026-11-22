@@ -7,6 +7,7 @@ Commands: connect, upload, download, list, quit, help.
 import argparse
 from contextlib import contextmanager
 import hashlib
+import os
 import re
 import socket
 import sys
@@ -114,19 +115,12 @@ def print_result(elapsed, num_bytes):
     print(f"Time: {elapsed:.3f} s, Application throughput: {mbps:.2f} Mbps")
 
 
-def sha256_stream(stream):
-    """Return (hex digest, byte count) of everything left in an open binary stream."""
-    digest = hashlib.sha256()
-    total = 0
-    for chunk in iter(lambda: stream.read(1024 * 1024), b""):
-        digest.update(chunk)
-        total += len(chunk)
-    return digest.hexdigest(), total
-
-
 def sha256_file(path):
+    digest = hashlib.sha256()
     with open(path, "rb") as stream:
-        return sha256_stream(stream)[0]
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def verify_checksum(value, expected):
@@ -326,8 +320,8 @@ class FileClient:
                 f"Cannot read local file {path}: {exc}. It may be in use by another program.") from exc
         with stream:
             try:
-                source_sha256, file_size = sha256_stream(stream)
-                stream.seek(0)
+                file_size = os.fstat(stream.fileno()).st_size
+                source_sha256 = sha256_file(path)
             except OSError as exc:
                 raise ClientError(f"Cannot read local file {path}: {exc}") from exc
             measurement.row.update(file_name=filename, file_size_bytes=file_size)

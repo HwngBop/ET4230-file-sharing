@@ -218,6 +218,29 @@ class UploadTests(ClientTestCase):
         self.assertEqual((row["status"], row["checksum_match"]), ("FAILED", "false"))
         self.assertEqual(row["throughput_mbps"], "")
 
+    def test_upload_hash_comes_from_sha256_file(self):
+        """sha256_file is the single source of the upload hash (other tests patch it)."""
+        def handler(sock, conn):
+            header = conn.receive_header()
+            conn.send_header({"status": "READY", "command": "UPLOAD",
+                              "filename": header["filename"], "file_size": header["file_size"]})
+            data = read_payload(conn, header["file_size"])
+            if sha(data) != header["sha256"]:
+                conn.send_header({"status": "ERROR", "code": "CHECKSUM_MISMATCH", "message": "Hash differs"})
+            else:
+                conn.send_header({"status": "SUCCESS", "command": "UPLOAD", "filename": header["filename"],
+                                  "file_size": len(data), "sha256": sha(data)})
+
+        client = self.start(handler)
+        self.connect()
+        path = self.local_file("h.bin", b"hash me" * 200)
+        with patch("client.client.sha256_file", return_value="0" * 64):
+            with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(ServerError) as ctx:
+                client.upload(str(path))
+        self.assertEqual(ctx.exception.code, "CHECKSUM_MISMATCH")
+        row, = self.rows()
+        self.assertEqual((row["status"], row["checksum_match"], row["throughput_mbps"]), ("FAILED", "false", ""))
+
     def test_upload_success_with_wrong_server_hash_is_failed(self):
         def handler(sock, conn):
             header = conn.receive_header()
