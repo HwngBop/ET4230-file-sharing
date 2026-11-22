@@ -283,6 +283,45 @@ class ConcurrentRunnerTests(unittest.TestCase):
         self.assertTrue(all(r["throughput_mbps"] == "" for r in rows if r["status"] == "FAILED"))
         self.assertEqual(path.read_bytes(), (client.download_dir / path.name).read_bytes())
 
+    def test_wrong_num_clients_from_client_integration_cannot_pass(self):
+        self.start_server()
+        class WrongConfigurationClient(WorkerClient):
+            def upload(self, path):
+                result = super().upload(path)
+                if self.client_id == "client-01":
+                    with self.csv_path.open(newline="") as stream:
+                        rows = list(csv.DictReader(stream))
+                    for row in rows:
+                        row["num_clients"] = "1"
+                    with self.csv_path.open("w", newline="") as stream:
+                        writer = csv.DictWriter(stream, fieldnames=CONCURRENT_FIELDS)
+                        writer.writeheader()
+                        writer.writerows(rows)
+                return result
+        code, summary = self.run_clients(5, client_factory=WrongConfigurationClient)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(summary["workers"][0]["status"], "FAIL")
+        self.assertEqual([w["status"] for w in summary["workers"][1:]], ["PASS"] * 4)
+        self.assertTrue(any("configuration mismatch" in e for e in summary["workers"][0]["errors"]))
+
+    def test_bad_success_metric_from_client_integration_cannot_pass(self):
+        self.start_server()
+        class WrongMetricClient(WorkerClient):
+            def upload(self, path):
+                result = super().upload(path)
+                with self.csv_path.open(newline="") as stream:
+                    rows = list(csv.DictReader(stream))
+                rows[-1]["throughput_mbps"] = "nan"
+                with self.csv_path.open("w", newline="") as stream:
+                    writer = csv.DictWriter(stream, fieldnames=CONCURRENT_FIELDS)
+                    writer.writeheader()
+                    writer.writerows(rows)
+                return result
+        code, summary = self.run_clients(1, client_factory=WrongMetricClient)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(summary["workers"][0]["status"], "FAIL")
+        self.assertTrue(any("Mbps metric" in e for e in summary["workers"][0]["errors"]))
+
     def test_invalid_input_and_no_fixtures(self):
         with self.assertRaises(ValueError):
             run_scenario(host="not-an-IP")

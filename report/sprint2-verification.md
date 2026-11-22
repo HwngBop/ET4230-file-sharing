@@ -1,6 +1,6 @@
 # Kiểm chứng tương thích server concurrent
 
-Ngày chạy: 21/11/2026. Runner trên nhánh `ha-nguyet`; server từ nhánh `cn21-10`, commit `a07b9503bb8d942cd16c3b1895ba06f1ecbff88d`. Không thay đổi code hoặc nhánh server/main.
+Ngày chạy: 22/11/2026. Runner trên nhánh `ha-nguyet`; server từ nhánh `cn21-10`, commit `a07b9503bb8d942cd16c3b1895ba06f1ecbff88d`. Không thay đổi code hoặc nhánh server/main.
 
 ## Môi trường và phạm vi
 
@@ -10,7 +10,7 @@ Code runner chưa commit tại thời điểm đo; metadata có commit nền và
 
 ## Kiểm thử
 
-- **54 tests OK** trên nhánh ha-nguyet, gồm bộ Sprint 1 và 10 test concurrent runner. Các ca concurrent dùng implementation server thật tại a07b950; ca đối chứng tuần tự dùng server đi kèm ha-nguyet.
+- **56 tests OK** trên nhánh ha-nguyet, gồm bộ Sprint 1 và 12 test concurrent runner. Các ca concurrent dùng implementation server thật tại a07b950; ca đối chứng tuần tự dùng server đi kèm ha-nguyet.
 - **60 tests OK** khi chạy suite riêng của server cn21-10 tại a07b950 trong checkout tách biệt.
 - Bộ runner độc lập không đặt biến dependency dùng fixture threaded chỉ trong test, không thay server production.
 
@@ -30,9 +30,9 @@ Ba file 1/10/50 MB, mỗi worker upload và download trên socket riêng. Không
 
 | Client | Dòng CSV | Toàn phiên | Overlap payload/completion chung (giây) |
 | --- | --- | --- | --- |
-| 1 | 6/6 | PASS | 0.06801049599994258 |
-| 5 | 30/30 | PASS | 0.028855159999920943 |
-| 10 | 60/60 | PASS | 0.055988908000017545 |
+| 1 | 6/6 | PASS | 0.017248096999992413 |
+| 5 | 30/30 | PASS | 0.03405784199981099 |
+| 10 | 60/60 | PASS | 0.07735836899996684 |
 
 Tất cả 96 lượt truyền SUCCESS, checksum_match=true. Đã đối chiếu thêm SHA-256 trên nguồn, đường dẫn upload worker, file nhận server và download cho 48 cặp file. Với một client, overlap chỉ là kiểm tra cơ sở. Server thử nghiệm đã được dừng.
 
@@ -42,4 +42,12 @@ Mẫu: [results/sprint2-samples](../results/sprint2-samples). Log unittest runne
 
 Server a07b950 chỉ áp dụng FILE_BUSY khi storage cung cấp try_lock_file. FileStorage production hiện chưa có hàm này; các test server tự bổ sung helper khóa. Cần triển khai/review phần storage trước khi tuyên bố bảo vệ file cùng tên. Runner chủ động dùng tên riêng mỗi phiên và worker.
 
-Chưa xác nhận trạng thái S2-01/S2-02/S2-03/S2-04 trên bảng công việc. Kết quả loopback không thay nghiệm thu Windows/LAN; nhóm chạy lại trên hai máy theo README và giữ metadata/CSV/log/PCAP thật. Chỉ nhánh ha-nguyet được cập nhật trong lần kiểm chứng này.
+Mapping S2-01/CN21-9, S2-02/CN21-10, S2-03/CN21-11, S2-04/CN21-12, S2-05/CN21-13 được đối chiếu theo contract v1.0; review/tích hợp vẫn cần owner xác nhận. Kết quả loopback không thay nghiệm thu Windows/LAN; nhóm chạy lại trên hai máy theo README và giữ metadata/CSV/log/PCAP thật. Chỉ nhánh ha-nguyet được cập nhật trong lần kiểm chứng này.
+
+## Regression theo frozen contract
+
+Đã chạy pytest 8.4.2: **56 passed** trên ha-nguyet với server dependency a07b950; **60 passed** trên server riêng. Log công khai: [runner-pytest.log](../results/sprint2-samples/runner-pytest.log), [server-pytest.log](../results/sprint2-samples/server-pytest.log).
+
+Hai test mới cố tình làm sai num_clients và metric SUCCESS sau khi client ghi CSV; runner phải FAIL để phát hiện sai lệch khi ghép client.py. Cả hai ca đạt kết quả mong đợi. Các dòng giả lập lỗi chỉ ở thư mục test tạm, không đưa vào CSV đo thật.
+
+Không sửa xử lý SERVER_BUSY của owner Client, không thay interface Storage/Server và không tự gửi ACK Jira. PR #6 vẫn trỏ bản cũ; review target hiện tại là ha-nguyet. Các gate phải hoàn tất trước DONE nằm trong [sprint2-contract-review.md](sprint2-contract-review.md).

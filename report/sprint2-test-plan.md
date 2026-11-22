@@ -4,7 +4,7 @@
 
 Runner `scripts/run_concurrent.py` tạo 1, 5 hoặc 10 worker trên một laptop; mỗi worker mở một TCP connection đến server. Không cần 5/10 máy vật lý. Để đo LAN cần ít nhất một máy client và một máy server; chạy localhost chỉ là kiểm chứng loopback.
 
-**Phụ thuộc server:** bản `main` tại `b2e3c98` vẫn phục vụ tuần tự. Server concurrent đã có trên nhánh `cn21-10`, commit `a07b950`. Runner không tự đổi server, merge branch hay sửa `main`. Chuẩn bị server bằng nhánh concurrent đã được nhóm review. S2-01/S2-02/S2-03/S2-04 cần nhóm đối chiếu trạng thái trên bảng công việc; trong repo hiện tại đã kiểm chứng được giao thức READY/SUCCESS, SHA-256 và server `cn21-10`.
+**Phụ thuộc server:** bản `main` tại `b2e3c98` vẫn phục vụ tuần tự. Server concurrent đã có trên nhánh `cn21-10`, commit `a07b950`. Runner không tự đổi server, merge branch hay sửa `main`. Chuẩn bị server bằng nhánh concurrent đã được nhóm review. Mapping theo contract: S2-01/CN21-9 (Hưng), S2-02/CN21-10 (Server), S2-03/CN21-11 (Client), S2-04/CN21-12 (Storage), S2-05/CN21-13 (runner); trạng thái review/tích hợp cần nhóm xác nhận; trong repo hiện tại đã kiểm chứng được giao thức READY/SUCCESS, SHA-256 và server `cn21-10`.
 
 Các thay đổi:
 
@@ -220,3 +220,9 @@ Không cần cài pytest. Nếu đã cài dependencies nhóm thì có thể dùn
 ## 10. Tương thích FILE_BUSY
 
 Server `a07b950` có nhánh trả FILE_BUSY nếu storage cung cấp try_lock_file. Storage production tại revision đó chưa có API khóa; các test server bổ sung helper riêng. Không coi test fixture là bằng chứng khóa production. Runner dùng tên khác nhau theo worker/phiên; test client bổ sung kiểm tra FILE_BUSY ở cả upload/download được ghi FAILED, throughput trống và cùng socket có thể thử lại thành công. Đây là kiểm chứng xử lý response ở client, không phải triển khai khóa trong storage.
+
+## 11. Review frozen contract
+
+Đối chiếu đầy đủ phạm vi CN21-13 và review gate: [sprint2-contract-review.md](sprint2-contract-review.md). Khi ghép client.py, runner kiểm tra client/session/environment IDs, num_clients/chunk và metric từng dòng thay vì chỉ đếm header/số dòng. CSV sai cấu hình hoặc SUCCESS có metric không hữu hạn phải làm kịch bản FAIL.
+
+Không tự sửa error contract thuộc owner Client hoặc interface Storage. Bản code đã kiểm chứng loopback vẫn chờ review tích hợp, Windows/Python 3.11 và LAN trước DONE.

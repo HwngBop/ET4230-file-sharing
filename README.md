@@ -4,6 +4,8 @@ Bộ công cụ đo lường và kiểm thử truyền file TCP cho Sprint 1–2
 
 Nhánh **`ha-nguyet`** chứa client, baseline runner, concurrent runner và tài liệu. Server đi kèm nhánh này là bản tuần tự. Để kiểm thử nhiều client, dùng server từ **`cn21-10`** trong một thư mục riêng. Không cần merge các nhánh để chạy thử.
 
+**Review contract:** [CN21-13 / S2-01 v1.0](report/sprint2-contract-review.md). Code runner đã có kiểm chứng loopback; Windows/LAN và review bản tích hợp còn chờ, chưa phải nghiệm thu DONE.
+
 ## 1. Điều kiện chạy
 
 - Windows 10/11, Python **3.11.x**; các script cốt lõi chỉ dùng thư viện chuẩn.
@@ -215,6 +217,15 @@ Nếu không đặt biến, test dùng fixture threaded riêng; fixture không t
 
 Server `cn21-10` tại `a07b950` đã có nhánh xử lý FILE_BUSY nhưng storage hiện chưa triển khai `try_lock_file`; các test khóa tự cung cấp helper. Vì vậy, không coi test đó là bằng chứng server production đã khóa file trùng tên. Runner dùng tên riêng từng phiên/worker. Client ghi FILE_BUSY là FAILED và giữ kết nối để có thể thử lại.
 
+Theo contract, regression tích hợp cần chạy pytest. Trong terminal runner (sau khi đặt PYTHONPATH và tùy chọn CONCURRENT_SERVER_FILE như trên):
+
+```bat
+py -3.11 -m pip install pytest==8.4.2
+py -3.11 -m pytest -q
+```
+
+Suite PASS trên một nhánh hoặc server riêng không thay full regression của bản đã ghép Server/Storage/Client. Không đổi trạng thái DONE khi Windows/LAN và review gate chưa hoàn tất. CSV tổng hợp còn được kiểm tra định danh, num_clients và metric để phát hiện lỗi khi tích hợp client.
+
 ## 11. Sprint 1 và client tương tác
 
 Server đi kèm `ha-nguyet` vẫn chạy tuần tự, dùng được cho baseline một client. Hướng dẫn đo một client: [report/measurement-guide.md](report/measurement-guide.md).
@@ -269,3 +280,5 @@ Sau khi thử xong, Ctrl+C ở terminal server. Runner không tự xóa file đ�
 - [Test plan Sprint 2](report/sprint2-test-plan.md)
 - [Kết quả kiểm chứng Sprint 2](report/sprint2-verification.md)
 - [Mẫu CSV Sprint 2](results/sprint2-samples/README.md)
+
+- [Đối chiếu contract và checklist DONE](report/sprint2-contract-review.md)

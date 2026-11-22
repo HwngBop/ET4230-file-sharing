@@ -1,21 +1,21 @@
 {
-  "environment_id": "d9e4e7d4-169a-44ec-997e-571e6a73cdbb",
-  "session_id": "903f32d9-e612-40cd-8701-7d551de6cff8",
-  "collected_at": "2026-11-21T14:22:30.696671+00:00",
+  "environment_id": "29e6db12-d5f6-40f2-822f-dbe0ac300580",
+  "session_id": "18300b20-3833-43da-a6fd-c4e19c4c200f",
+  "collected_at": "2026-11-22T06:42:13.245864+00:00",
   "client": {
     "role": "client",
-    "collected_at": "2026-11-21T14:22:30.717367+00:00",
+    "collected_at": "2026-11-22T06:42:13.263984+00:00",
     "os": "Linux-6.18.57-x86_64-with-glibc2.41",
     "python_version": "3.12.14",
     "ip": "127.0.0.1",
     "network_type": "loopback",
     "chunk_size_bytes": 65536,
-    "commit_sha": "ef00dc8a189368cab8f4d2a86ec7cd51034b03f4",
+    "commit_sha": "76356b637f2298bb8c08f6199997271bb2bd4c6c",
     "working_tree_dirty": true
   },
   "server": {
     "role": "server",
-    "collected_at": "2026-11-21T14:22:28.213686+00:00",
+    "collected_at": "2026-11-22T06:42:10.943633+00:00",
     "os": "Linux-6.18.57-x86_64-with-glibc2.41",
     "python_version": "3.12.14",
     "ip": "127.0.0.1",
@@ -27,7 +27,7 @@
   },
   "num_clients": 10,
   "host": "127.0.0.1",
-  "port": 35453,
+  "port": 39395,
   "chunk_size_bytes": 65536,
   "bandwidth_limit_mbps": "unlimited",
   "bytes_per_MB": 1000000,
@@ -38,7 +38,7 @@
   "same_host": true,
   "server_metadata_complete": true,
   "source_sha256": {
-    "scripts/run_concurrent.py": "d7dbeeacd1f0bf2d961f9619f77772c3f50e98bc728936455f7d7df33e22544e",
+    "scripts/run_concurrent.py": "bc3c17955bd450226ccd3bc4e45782059201ea1eaf03aa2f291ec4b77f8b3262",
     "src/client/client.py": "4a92ebd87766a826a699cb9de4044ac3bd7fcf89307ad675c48ae216abc62257",
     "src/common/measurement.py": "c956ee05093f04c0e8de8d719acbad506ea37cfaa8fb8485b340949eae3d6e9c",
     "src/common/csv_logger.py": "552c30e70e8d7e162b3dda5aa25ff2caf7f4cc26c65c6fae19cd4b8bac742dd8"
@@ -60,43 +60,43 @@
   "client_socket_addresses": [
     [
       "127.0.0.1",
-      50974
+      45016
     ],
     [
       "127.0.0.1",
-      51012
+      45032
     ],
     [
       "127.0.0.1",
-      50968
+      45060
     ],
     [
       "127.0.0.1",
-      51028
+      45048
     ],
     [
       "127.0.0.1",
-      51002
+      45074
     ],
     [
       "127.0.0.1",
-      50966
+      45078
     ],
     [
       "127.0.0.1",
-      51030
+      45086
     ],
     [
       "127.0.0.1",
-      50988
+      45102
     ],
     [
       "127.0.0.1",
-      51038
+      45096
     ],
     [
       "127.0.0.1",
-      51000
+      45118
     ]
   ],
   "public_sample_note": "Hardware identifiers omitted from this public copy; original run metadata remains in the local session. Loopback addresses and original timings retained."

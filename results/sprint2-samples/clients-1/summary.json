@@ -1,6 +1,6 @@
 {
-  "session_id": "3d55079a-bb91-47bd-aabd-1ef622430da8",
-  "environment_id": "d17c428f-2a59-4f21-8702-407af3e603e5",
+  "session_id": "672a72dd-6c4a-4bf0-8f48-1a1abb5699df",
+  "environment_id": "bc7b2395-1315-43b3-bbcd-8dffb2ae7cab",
   "status": "PASS",
   "num_clients": 1,
   "expected_rows": 6,
@@ -11,14 +11,14 @@
     "applicable": false,
     "method": "first upload: READY-to-completion overlap and all READY before first payload",
     "all_ready_before_payload": true,
-    "shared_processing_overlap_s": 0.0680212559998381,
-    "shared_payload_completion_overlap_s": 0.06801049599994258,
+    "shared_processing_overlap_s": 0.017258616999924925,
+    "shared_payload_completion_overlap_s": 0.017248096999992413,
     "ready_gate_broken": false,
     "ready_times_s": {
-      "client-01": 1311.726306511
+      "client-01": 1584.306320674
     },
     "payload_release_times_s": {
-      "client-01": 1311.726317271
+      "client-01": 1584.306331194
     },
     "clock": "perf_counter on one runner process; not comparable across hosts",
     "note": "Demonstrates concurrent application dispatch/waiting, not parallel CPU execution or wire-level packet overlap."
@@ -26,60 +26,60 @@
   "workers": [
     {
       "client_id": "client-01",
-      "session_id": "3d55079a-bb91-47bd-aabd-1ef622430da8",
+      "session_id": "672a72dd-6c4a-4bf0-8f48-1a1abb5699df",
       "status": "PASS",
       "errors": [],
       "expected_rows": 6,
       "local_address": [
         "127.0.0.1",
-        50904
+        44980
       ],
       "server_address": [
         "127.0.0.1",
-        35453
+        39395
       ],
       "transfers": [
         {
-          "run_id": "cc86d650-8c65-488e-a0a5-dbbfdfed7adf",
+          "run_id": "cf133377-e7f9-4a02-9302-6256ece5b09c",
           "direction": "upload",
           "status": "SUCCESS",
-          "transfer_start_s": 1311.722103427,
-          "transfer_end_s": 1311.794327767
+          "transfer_start_s": 1584.305186675,
+          "transfer_end_s": 1584.323579291
         },
         {
-          "run_id": "cdff4009-b6f3-4614-9fbd-5345e5e621e1",
+          "run_id": "ebebaf31-c66c-4360-b400-619b4ca80cbe",
           "direction": "download",
           "status": "SUCCESS",
-          "transfer_start_s": 1311.794951803,
-          "transfer_end_s": 1311.849182069
+          "transfer_start_s": 1584.323972077,
+          "transfer_end_s": 1584.347652956
         },
         {
-          "run_id": "1225e9ed-ffba-48fc-b85a-acccaab0a13b",
+          "run_id": "e7a02b98-fae7-459d-8013-3f4494674a71",
           "direction": "upload",
           "status": "SUCCESS",
-          "transfer_start_s": 1311.850479141,
-          "transfer_end_s": 1311.864642652
+          "transfer_start_s": 1584.349718328,
+          "transfer_end_s": 1584.352827504
         },
         {
-          "run_id": "e89fd7ce-7adb-4641-b9cd-0191361635cf",
+          "run_id": "b5c35277-8b29-4556-ac68-fa94acbc621d",
           "direction": "download",
           "status": "SUCCESS",
-          "transfer_start_s": 1311.864997431,
-          "transfer_end_s": 1311.869812952
+          "transfer_start_s": 1584.353134805,
+          "transfer_end_s": 1584.355534855
         },
         {
-          "run_id": "3838e4fd-40f3-46e4-9c80-090206bfcafb",
+          "run_id": "9b5f1e99-b04b-460b-8dc5-9f910c4ea5ea",
           "direction": "upload",
           "status": "SUCCESS",
-          "transfer_start_s": 1311.914020853,
-          "transfer_end_s": 1312.290024061
+          "transfer_start_s": 1584.412565156,
+          "transfer_end_s": 1584.504811364
         },
         {
-          "run_id": "f8eda309-c7a9-4235-adc1-bad644ca7d2f",
+          "run_id": "9a5f2885-72e9-48a5-b7e0-455ea300e55c",
           "direction": "download",
           "status": "SUCCESS",
-          "transfer_start_s": 1312.290367682,
-          "transfer_end_s": 1312.431781732
+          "transfer_start_s": 1584.505099946,
+          "transfer_end_s": 1584.700823605
         }
       ],
       "row_count": 6,
