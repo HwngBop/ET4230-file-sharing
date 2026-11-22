@@ -34,9 +34,9 @@ CHUNK_SIZE = 65536
 # Error contract. RECOVERABLE: the server keeps the connection open, so the next
 # command may be sent. Everything else (including unknown codes) is FATAL: the
 # client closes its socket and the user must run 'connect' again.
-# NOTE: classification of SERVER_BUSY / FILE_BUSY follows the S2-01 design
-# assumption (busy server closes the session, busy file keeps it); change it
-# here only.
+# Classification follows the frozen contract S2-01 v1.0 (section 4.2): SERVER_BUSY is
+# fatal (the server closes the session), FILE_BUSY is recoverable (the session stays
+# open). Do not change it without a new contract version.
 RECOVERABLE_ERROR_CODES = {
     "INVALID_COMMAND",
     "INVALID_FILENAME",
