@@ -4,6 +4,8 @@ Bộ công cụ đo lường và kiểm thử truyền file TCP cho Sprint 1–2
 
 Nhánh **`ha-nguyet`** chứa client, baseline runner, concurrent runner và tài liệu. Server đi kèm nhánh này là bản tuần tự. Để kiểm thử nhiều client, dùng server từ **`cn21-10`** trong một thư mục riêng. Không cần merge các nhánh để chạy thử.
 
+**Kế hoạch hiện tại:** [CN21-13 — trạng thái PR và các bước thực hiện](report/sprint2-execution-plan.md). PR #8 chưa merge: chỉ chuẩn bị runner/test, chưa tích hợp cuối client.py. API Backend theo điều phối mới là `locked(filename, owner=connection_id)`.
+
 **Review contract:** [CN21-13 / S2-01 v1.0](report/sprint2-contract-review.md). Code runner đã có kiểm chứng loopback; Windows/LAN và review bản tích hợp còn chờ, chưa phải nghiệm thu DONE.
 
 ## 1. Điều kiện chạy
@@ -215,7 +217,7 @@ set CONCURRENT_SERVER_FILE=
 
 Nếu không đặt biến, test dùng fixture threaded riêng; fixture không thay server production. Kết quả kiểm chứng revision hiện tại xem [report/sprint2-verification.md](report/sprint2-verification.md). Chạy trên Linux/Python 3.12 không thay chứng nhận chạy Windows/Python 3.11.
 
-Server `cn21-10` tại `a07b950` đã có nhánh xử lý FILE_BUSY nhưng storage hiện chưa triển khai `try_lock_file`; các test khóa tự cung cấp helper. Vì vậy, không coi test đó là bằng chứng server production đã khóa file trùng tên. Runner dùng tên riêng từng phiên/worker. Client ghi FILE_BUSY là FAILED và giữ kết nối để có thể thử lại.
+Server `cn21-10` tại `a07b950` còn gọi optional `try_lock_file`; theo điều phối mới Server phải chuyển sang `locked(filename, owner=connection_id)` mà Storage PR #7 cung cấp. Backend chưa tích hợp và các test khóa hiện tự cung cấp helper. Vì vậy, không coi test đó là bằng chứng server production đã khóa file trùng tên. Runner dùng tên riêng từng phiên/worker. Client ghi FILE_BUSY là FAILED và giữ kết nối để có thể thử lại.
 
 Theo contract, regression tích hợp cần chạy pytest. Trong terminal runner (sau khi đặt PYTHONPATH và tùy chọn CONCURRENT_SERVER_FILE như trên):
 
@@ -282,3 +284,5 @@ Sau khi thử xong, Ctrl+C ở terminal server. Runner không tự xóa file đ�
 - [Mẫu CSV Sprint 2](results/sprint2-samples/README.md)
 
 - [Đối chiếu contract và checklist DONE](report/sprint2-contract-review.md)
+
+- [Kế hoạch CN21-13 và điều kiện tích hợp sau PR #8](report/sprint2-execution-plan.md)

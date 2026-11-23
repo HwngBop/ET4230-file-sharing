@@ -51,3 +51,7 @@ Mapping S2-01/CN21-9, S2-02/CN21-10, S2-03/CN21-11, S2-04/CN21-12, S2-05/CN21-13
 Hai test mới cố tình làm sai num_clients và metric SUCCESS sau khi client ghi CSV; runner phải FAIL để phát hiện sai lệch khi ghép client.py. Cả hai ca đạt kết quả mong đợi. Các dòng giả lập lỗi chỉ ở thư mục test tạm, không đưa vào CSV đo thật.
 
 Không sửa xử lý SERVER_BUSY của owner Client, không thay interface Storage/Server và không tự gửi ACK Jira. PR #6 vẫn trỏ bản cũ; review target hiện tại là ha-nguyet. Các gate phải hoàn tất trước DONE nằm trong [sprint2-contract-review.md](sprint2-contract-review.md).
+
+## Cập nhật dependency ngày 23/11
+
+Các kết quả ở trên được chạy ngày 22/11 trên server a07b950, không được hiểu là kết quả sau tích hợp PR #8/Storage. Điều phối mới chốt locked(filename, owner=connection_id); Server hiện còn hook try_lock_file. PR #7/#8 chưa merge tại lúc rà soát. Runner tiếp tục chuẩn bị, chỉ tích hợp cuối sau PR #8 merge theo [kế hoạch hiện tại](sprint2-execution-plan.md). Không đổi mẫu CSV hoặc timestamp cũ để thể hiện nghiệm thu mới.

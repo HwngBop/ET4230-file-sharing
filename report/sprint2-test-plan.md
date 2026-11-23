@@ -2,6 +2,8 @@
 
 ## 1. Phạm vi và phụ thuộc
 
+**Cập nhật điều phối 23/11:** Backend chốt `locked(filename, owner=connection_id)`. PR #8 còn OPEN nên chưa tích hợp cuối/rebase runner. [Kế hoạch theo dependency](sprint2-execution-plan.md) xác định bước nào được phép thực hiện; các lệnh với server a07b950 dưới đây chỉ kiểm chứng bản server riêng, không phải nghiệm thu Backend mới.
+
 Runner `scripts/run_concurrent.py` tạo 1, 5 hoặc 10 worker trên một laptop; mỗi worker mở một TCP connection đến server. Không cần 5/10 máy vật lý. Để đo LAN cần ít nhất một máy client và một máy server; chạy localhost chỉ là kiểm chứng loopback.
 
 **Phụ thuộc server:** bản `main` tại `b2e3c98` vẫn phục vụ tuần tự. Server concurrent đã có trên nhánh `cn21-10`, commit `a07b950`. Runner không tự đổi server, merge branch hay sửa `main`. Chuẩn bị server bằng nhánh concurrent đã được nhóm review. Mapping theo contract: S2-01/CN21-9 (Hưng), S2-02/CN21-10 (Server), S2-03/CN21-11 (Client), S2-04/CN21-12 (Storage), S2-05/CN21-13 (runner); trạng thái review/tích hợp cần nhóm xác nhận; trong repo hiện tại đã kiểm chứng được giao thức READY/SUCCESS, SHA-256 và server `cn21-10`.
@@ -219,7 +221,7 @@ Không cần cài pytest. Nếu đã cài dependencies nhóm thì có thể dùn
 
 ## 10. Tương thích FILE_BUSY
 
-Server `a07b950` có nhánh trả FILE_BUSY nếu storage cung cấp try_lock_file. Storage production tại revision đó chưa có API khóa; các test server bổ sung helper riêng. Không coi test fixture là bằng chứng khóa production. Runner dùng tên khác nhau theo worker/phiên; test client bổ sung kiểm tra FILE_BUSY ở cả upload/download được ghi FAILED, throughput trống và cùng socket có thể thử lại thành công. Đây là kiểm chứng xử lý response ở client, không phải triển khai khóa trong storage.
+Server `a07b950` có nhánh trả FILE_BUSY nếu storage cung cấp try_lock_file. Theo điều phối mới, API đích là locked(filename, owner=connection_id); Storage PR #7 đã có locked nhưng Server chưa gọi API đó. Các test server hiện bổ sung helper riêng. Không coi test fixture là bằng chứng khóa production. Runner dùng tên khác nhau theo worker/phiên; test client bổ sung kiểm tra FILE_BUSY ở cả upload/download được ghi FAILED, throughput trống và cùng socket có thể thử lại thành công. Đây là kiểm chứng xử lý response ở client, không phải triển khai khóa trong storage.
 
 ## 11. Review frozen contract
 

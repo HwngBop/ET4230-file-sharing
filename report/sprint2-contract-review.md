@@ -1,6 +1,6 @@
 # CN21-13 — Review S2-01 v1.0
 
-Ngày rà soát: 22/11/2026. Nguồn yêu cầu: **ET4230-S2-01 — Multi-client Architecture & Protocol Contract v1.0**, Hưng ban hành ngày 20/11/2026, attachment CN21-9. Tài liệu này đối chiếu phần Concurrent Testing/CSV; không thay thế hoặc sửa frozen contract.
+Ngày rà soát: 23/11/2026. Nguồn yêu cầu: **ET4230-S2-01 — Multi-client Architecture & Protocol Contract v1.0**, Hưng ban hành ngày 20/11/2026, attachment CN21-9. Tài liệu này đối chiếu phần Concurrent Testing/CSV; không thay thế hoặc sửa frozen contract. Thông báo điều phối mới chốt `locked(filename, owner=connection_id)` và chỉ tích hợp runner sau PR #8 merge; xem [kế hoạch hiện tại](sprint2-execution-plan.md).
 
 ## 1. Trạng thái
 
@@ -31,8 +31,8 @@ Upload đầu tính cả thời gian chờ READY gate. Kết quả chứng minh 
 | Dependency | Tình trạng cần review |
 | --- | --- |
 | S2-02 / CN21-10 — Server | Server concurrent được kiểm tra tại a07b950; cần ghép đúng storage API |
-| S2-03 / CN21-11 — Client | SERVER_BUSY chưa nằm trong FATAL_ERROR_CODES của client hiện tại; owner Client bổ sung trên nền optional fields, không overwrite file |
-| S2-04 / CN21-12 — Storage | PR #7 dùng locked(...), trong khi contract và server yêu cầu try_lock_file(filename) context manager yield bool |
+| S2-03 / CN21-11 — Client | PR #8 đã có SERVER_BUSY fatal nhưng còn OPEN; sau merge phải ghép với optional fields của runner, không overwrite |
+| S2-04 / CN21-12 — Storage | Theo điều phối mới, locked(filename, owner=connection_id) là API đích; Storage PR #7 có locked, Server a07b950 còn gọi try_lock_file nên Backend chưa tích hợp |
 | S2-01 / CN21-9 — Team Lead | Chốt interface/review và xác nhận branch dùng tích hợp; contract cần đổi phải có version mới |
 | S2-06 — Integration | Merge theo dependency, full regression tích hợp và LAN E2E do Team Lead điều phối |
 
@@ -47,11 +47,15 @@ Không chỉnh source Server/Storage/Protocol hoặc tự merge vào main trong 
 - [x] Regression nhánh runner và suite server riêng được thực thi; đây không phải full regression của bản đã tích hợp Storage/Client mới.
 - [ ] Team Lead nhận xác nhận S2-01 v1.0 tại CN21-9.
 - [ ] Team Lead thống nhất PR/branch review cho bản mới trên ha-nguyet.
-- [ ] Storage API khớp try_lock_file và Server/Storage được tích hợp/review.
-- [ ] Member Client hoàn tất SERVER_BUSY fatal và ghép client.py không mất optional fields.
+- [ ] Backend dùng locked(filename, owner=connection_id), không bỏ qua khóa và đã được tích hợp/review.
+- [ ] PR #8 đã merge; runner ghép client.py sau đó, giữ đủ reliability và optional fields.
 - [ ] Full regression bản tích hợp PASS theo AC01.
 - [ ] Chạy Windows/Python 3.11 sau tích hợp, lưu kết quả thực tế.
 - [ ] LAN PC Server Ethernet → laptop Wi-Fi, ít nhất 5 client E2E theo AC12 do Hưng điều phối; lưu CSV/log/metadata và ảnh/capture nếu thu được.
 - [ ] Team Lead chấp nhận phạm vi còn loại trừ (nếu có) và duyệt trạng thái cuối.
 
 ACK contract là xác nhận đã thống nhất thiết kế, không thay nghiệm thu hoặc code review. Gate còn mở thì giữ trạng thái REVIEW/IN PROGRESS, không chuyển DONE và không sửa CSV để hợp thức hóa.
+
+## 5. Lịch điều phối hiện tại
+
+Backend hoàn thiện trước 25/11, dự kiến Team Lead review 26/11; Client trước 28/11; runner trước 29/11, tích hợp cuối chỉ sau PR #8 merge. Trạng thái và kế hoạch từng gate được ghi tại [sprint2-execution-plan.md](sprint2-execution-plan.md). Không coi ngày dự kiến là bằng chứng dependency đã hoàn tất.
