@@ -4,6 +4,8 @@ Set CONCURRENT_SERVER_FILE to cn21-10/src/server/server.py to also exercise
 that dependency's implementation instead of the test-only threaded fixture.
 """
 import csv
+from datetime import datetime, timezone
+from uuid import uuid4
 import importlib.util
 import json
 import logging
@@ -23,7 +25,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 from server.server import FileServer
 from server.config import ServerConfig
-from run_concurrent import WorkerClient, ReadyGate, run_scenario, main
+from run_concurrent import WorkerClient, ReadyGate, run_scenario, main, validate_worker_rows
 from client.client import ServerError
 from common.protocol import ProtocolError
 from common.csv_logger import CONCURRENT_FIELDS, FIELDS
@@ -322,6 +324,26 @@ class ConcurrentRunnerTests(unittest.TestCase):
         self.assertEqual(summary["workers"][0]["status"], "FAIL")
         self.assertTrue(any("Mbps metric" in e for e in summary["workers"][0]["errors"]))
 
+    def test_wrong_file_size_with_consistent_mbps_cannot_pass(self):
+        self.start_server()
+        class WrongSizeClient(WorkerClient):
+            def upload(self, path):
+                result = super().upload(path)
+                with self.csv_path.open(newline="") as stream:
+                    rows = list(csv.DictReader(stream))
+                row = rows[-1]
+                row["file_size_bytes"] = "1"
+                row["throughput_mbps"] = str(8 / (float(row["transfer_time_s"]) * 1_000_000))
+                with self.csv_path.open("w", newline="") as stream:
+                    writer = csv.DictWriter(stream, fieldnames=CONCURRENT_FIELDS)
+                    writer.writeheader()
+                    writer.writerows(rows)
+                return result
+        code, summary = self.run_clients(1, client_factory=WrongSizeClient)
+        self.assertNotEqual(code, 0)
+        self.assertEqual(summary["workers"][0]["status"], "FAIL")
+        self.assertTrue(any("differs from source fixture" in e for e in summary["workers"][0]["errors"]))
+
     def test_invalid_input_and_no_fixtures(self):
         with self.assertRaises(ValueError):
             run_scenario(host="not-an-IP")
@@ -330,6 +352,47 @@ class ConcurrentRunnerTests(unittest.TestCase):
         empty = self.root / "empty"
         empty.mkdir()
         self.assertEqual(main(["--host", "127.0.0.1", "--files-dir", str(empty)]), 1)
+
+
+class WorkerCsvValidationTests(unittest.TestCase):
+    def setUp(self):
+        self.row = dict(run_id=str(uuid4()), timestamp=datetime.now(timezone.utc).isoformat(),
+            direction="upload", file_name="fixture.bin", file_size_bytes="1000000",
+            client_id="client-01", session_id="session", environment_id="environment",
+            num_clients="5", chunk_size_bytes="65536", status="SUCCESS",
+            checksum_match="true", transfer_time_s="2", throughput_mbps="4", error_message="")
+
+    def check_rows(self, rows):
+        return validate_worker_rows(rows, [("upload", "fixture.bin")],
+            client_id="client-01", session_id="session", environment_id="environment",
+            num_clients=5, expected_sizes={("upload", "fixture.bin"): 1_000_000})
+
+    def test_valid_row_and_failed_attempt_without_known_size(self):
+        self.assertEqual(self.check_rows([self.row]), [])
+        row = dict(self.row, status="FAILED", checksum_match="", file_size_bytes="",
+                   transfer_time_s="", throughput_mbps="", error_message="source could not be opened")
+        self.assertEqual(self.check_rows([row]), [])
+
+    def test_invalid_uuid_or_timezone_is_rejected(self):
+        for change in ({"run_id": ""}, {"run_id": "not-a-uuid"},
+                       {"timestamp": "2026-11-23T12:00:00"}, {"timestamp": "invalid"}):
+            with self.subTest(change=change):
+                errors = self.check_rows([dict(self.row, **change)])
+                self.assertTrue(any("timestamp" in e for e in errors))
+
+    def test_wrong_size_is_rejected_even_when_mbps_formula_matches(self):
+        errors = self.check_rows([dict(self.row, file_size_bytes="1", throughput_mbps="0.000004")])
+        self.assertTrue(any("source fixture" in e for e in errors))
+
+    def test_failed_row_requires_reason_and_no_throughput(self):
+        errors = self.check_rows([dict(self.row, status="FAILED", checksum_match="false")])
+        self.assertTrue(any("error_message" in e for e in errors))
+        self.assertTrue(any("must not contain throughput" in e for e in errors))
+
+    def test_missing_or_duplicate_planned_operation_is_rejected(self):
+        for rows in ([], [self.row, dict(self.row, run_id=str(uuid4()))]):
+            with self.subTest(count=len(rows)):
+                self.assertTrue(any("planned transfer" in e for e in self.check_rows(rows)))
 
 
 if __name__ == "__main__":

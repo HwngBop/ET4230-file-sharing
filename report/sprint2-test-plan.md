@@ -228,3 +228,7 @@ Server `a07b950` có nhánh trả FILE_BUSY nếu storage cung cấp try_lock_fi
 Đối chiếu đầy đủ phạm vi CN21-13 và review gate: [sprint2-contract-review.md](sprint2-contract-review.md). Khi ghép client.py, runner kiểm tra client/session/environment IDs, num_clients/chunk và metric từng dòng thay vì chỉ đếm header/số dòng. CSV sai cấu hình hoặc SUCCESS có metric không hữu hạn phải làm kịch bản FAIL.
 
 Không tự sửa error contract thuộc owner Client hoặc interface Storage. Bản code đã kiểm chứng loopback vẫn chờ review tích hợp, Windows/Python 3.11 và LAN trước DONE.
+
+## 12. Kiểm tra CSV chuẩn bị trước tích hợp
+
+Ngoài metric/schema/context, đối chiếu file_size_bytes với fixture nguồn, run_id UUID, timestamp có múi giờ và lý do FAILED. Dòng báo sai byte nhưng rate tính khớp không được PASS. Kiểm tra độc lập và log: [sprint2-preparation-verification.md](sprint2-preparation-verification.md). Bước này không ghép code Client Reliability hoặc thay đổi Backend.

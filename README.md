@@ -286,3 +286,5 @@ Sau khi thử xong, Ctrl+C ở terminal server. Runner không tự xóa file đ�
 - [Đối chiếu contract và checklist DONE](report/sprint2-contract-review.md)
 
 - [Kế hoạch CN21-13 và điều kiện tích hợp sau PR #8](report/sprint2-execution-plan.md)
+
+- [Kiểm chứng phần chuẩn bị runner ngày 23/11](report/sprint2-preparation-verification.md)

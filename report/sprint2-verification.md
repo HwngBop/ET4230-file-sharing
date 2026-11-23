@@ -55,3 +55,7 @@ Không sửa xử lý SERVER_BUSY của owner Client, không thay interface Stor
 ## Cập nhật dependency ngày 23/11
 
 Các kết quả ở trên được chạy ngày 22/11 trên server a07b950, không được hiểu là kết quả sau tích hợp PR #8/Storage. Điều phối mới chốt locked(filename, owner=connection_id); Server hiện còn hook try_lock_file. PR #7/#8 chưa merge tại lúc rà soát. Runner tiếp tục chuẩn bị, chỉ tích hợp cuối sau PR #8 merge theo [kế hoạch hiện tại](sprint2-execution-plan.md). Không đổi mẫu CSV hoặc timestamp cũ để thể hiện nghiệm thu mới.
+
+## Kiểm chứng chuẩn bị tiếp theo ngày 23/11
+
+Runner đã được bổ sung kiểm tra byte/UUID/timezone/lý do lỗi, pytest 62/62 PASS và 18/18 test runner độc lập PASS. Lần chạy này không ghép PR #8, không thay Backend hoặc số liệu cũ. Chi tiết và log ở [sprint2-preparation-verification.md](sprint2-preparation-verification.md).

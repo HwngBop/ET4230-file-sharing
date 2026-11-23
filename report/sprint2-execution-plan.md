@@ -84,3 +84,9 @@ Không đổi baseline Sprint 1, không sửa source Server/Storage/Protocol, kh
 Kết quả **22/11**: 56 test runner PASS, 60 test server riêng PASS; loopback 1/5/10 client PASS với server a07b950. Xem [sprint2-verification.md](sprint2-verification.md). Những kết quả này không chứng minh PR #8 hoặc Backend locked(...) đã được tích hợp.
 
 Trạng thái hiện tại: **CN21-13 — code chuẩn bị sẵn, chờ dependency/review; chưa DONE.**
+
+## 7. Phần chuẩn bị đã thực hiện ngày 23/11
+
+Đã bổ sung kiểm tra kích thước CSV so với fixture, UUID/timestamp và lý do FAILED trong runner; thêm sáu test độc lập. Pytest 62/62 PASS. CLI loopback 1/5/10 client với server a07b950 vẫn PASS, đúng 6/30/60 dòng. Các kết quả này không yêu cầu ghép PR #8 và không mở khóa bước tích hợp cuối. Xem [kiểm chứng phần chuẩn bị](sprint2-preparation-verification.md).
+
+Giữ lại các bước BLOCKED/PENDING ở mục 4; không sửa client.py, Server/Storage hoặc baseline Sprint 1 trong lần chuẩn bị này.

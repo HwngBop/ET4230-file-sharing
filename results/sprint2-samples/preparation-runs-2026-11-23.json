@@ -1,0 +1,52 @@
+{
+  "date": "2026-11-23",
+  "phase": "pre-integration preparation",
+  "python_version": "3.12.14",
+  "network_type": "loopback",
+  "runner_base_commit": "b9cabe4945473f198fca2dfb771b8c1a126ff287",
+  "working_tree_dirty": true,
+  "server_commit": "a07b9503bb8d942cd16c3b1895ba06f1ecbff88d",
+  "source_sha256": {
+    "scripts/run_concurrent.py": "c8986c05b5c4a7e802ce2f7cb56f4648bdaa637acb31fbaf48ee7902959fac30",
+    "src/client/client.py": "4a92ebd87766a826a699cb9de4044ac3bd7fcf89307ad675c48ae216abc62257",
+    "src/common/measurement.py": "c956ee05093f04c0e8de8d719acbad506ea37cfaa8fb8485b340949eae3d6e9c",
+    "src/common/csv_logger.py": "552c30e70e8d7e162b3dda5aa25ff2caf7f4cc26c65c6fae19cd4b8bac742dd8"
+  },
+  "raw_results_retained_locally": true,
+  "post_pr8_integration_acceptance": "PENDING",
+  "runs": [
+    {
+      "num_clients": 1,
+      "session_id": "ca718ad6-008b-4c5a-b8e5-4e109f362946",
+      "environment_id": "1e84d45a-3eb5-4948-9324-7c6b394309d8",
+      "collected_at": "2026-11-23T06:15:49.168789+00:00",
+      "expected_rows": 6,
+      "actual_rows": 6,
+      "status": "PASS",
+      "concurrency": "PASS",
+      "overlap_s": 0.02575231100036035
+    },
+    {
+      "num_clients": 5,
+      "session_id": "b63b58a5-0290-4838-9198-cdbb6b71e468",
+      "environment_id": "4a68a77e-76e2-4c6d-b25f-87c3000e3c34",
+      "collected_at": "2026-11-23T06:15:51.117089+00:00",
+      "expected_rows": 30,
+      "actual_rows": 30,
+      "status": "PASS",
+      "concurrency": "PASS",
+      "overlap_s": 0.21307593199981056
+    },
+    {
+      "num_clients": 10,
+      "session_id": "95c819e6-fdf4-457d-9b0d-e4b8f45a7908",
+      "environment_id": "e775c476-ecc5-4db1-831a-3e57716dbf20",
+      "collected_at": "2026-11-23T06:15:53.404620+00:00",
+      "expected_rows": 60,
+      "actual_rows": 60,
+      "status": "PASS",
+      "concurrency": "PASS",
+      "overlap_s": 0.6910071180000159
+    }
+  ]
+}

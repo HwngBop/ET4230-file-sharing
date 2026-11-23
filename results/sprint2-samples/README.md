@@ -17,3 +17,5 @@ Test-suite.log trích dòng unittest từ lần chạy 56 test trên nhánh ha-n
 Upload đầu tính thời gian chờ gate READY, dùng để nghiệm thu concurrency. Mẫu localhost không thay baseline LAN/Windows và không dùng làm tốc độ card mạng. Xem [README](../../README.md) và [test plan](../../report/sprint2-test-plan.md).
 
 Runner-pytest.log và server-pytest.log giữ output pytest thực tế: 56 test nhánh runner và 60 test server riêng. Không coi hai suite riêng là nghiệm thu AC01 của bản tích hợp Storage/Client mới. Checklist còn mở: [contract review](../../report/sprint2-contract-review.md).
+
+Bổ sung ngày 23/11: preparation-pytest-2026-11-23.log ghi 62 test PASS; preparation-runs-2026-11-23.json là biên nhận ba lần chạy loopback với runner đã tăng kiểm tra CSV. Các thư mục clients-1/5/10 phía trên vẫn là mẫu ngày 22/11; không thay bằng kết quả sau tích hợp PR #8.
