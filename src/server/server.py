@@ -1,6 +1,5 @@
 """A bounded thread-per-connection TCP server supporting concurrent clients."""
 
-from contextlib import contextmanager
 import hashlib
 import logging
 import os
@@ -209,17 +208,6 @@ class FileServer:
             if worker is not current and worker.is_alive():
                 worker.join(timeout=5.0)
 
-    @contextmanager
-    def _acquire_file_lock(self, filename):
-        try_lock_file = getattr(self.storage, "try_lock_file", None)
-        if try_lock_file is None:
-            yield
-            return
-        with try_lock_file(filename) as acquired:
-            if not acquired:
-                raise ProtocolError("FILE_BUSY", "File is currently in use", fatal=False)
-            yield
-
     def _log(self, context, status, message):
         self.logger.info(
             message,
@@ -245,47 +233,50 @@ class FileServer:
             "client_port": address[1],
         }
         self._log({**peer, "command": "CONNECT"}, "CONNECTED", "Client connected")
-        while not self.stopping:
-            context = {**peer, "command": None, "filename": None, "file_size": None}
-            try:
-                request = connection.receive_header()
-                if request is None:
-                    self._log({**peer, "command": "DISCONNECT"}, "DISCONNECTED", "Client closed connection")
+        try:
+            while not self.stopping:
+                context = {**peer, "command": None, "filename": None, "file_size": None}
+                try:
+                    request = connection.receive_header()
+                    if request is None:
+                        self._log({**peer, "command": "DISCONNECT"}, "DISCONNECTED", "Client closed connection")
+                        break
+                    context.update({key: request.get(key) for key in ("command", "filename", "file_size")})
+                    command = request.get("command")
+                    if not isinstance(command, str) or command not in ("UPLOAD", "DOWNLOAD", "LIST", "QUIT"):
+                        raise ProtocolError("INVALID_COMMAND", "Expected UPLOAD, DOWNLOAD, LIST or QUIT")
+                    if command == "UPLOAD":
+                        self._upload(connection, request, context)
+                    elif command == "DOWNLOAD":
+                        self._download(connection, request, context)
+                    elif command == "LIST":
+                        connection.send_header({"status": "OK", "command": "LIST", "files": self.storage.list_files()})
+                    else:
+                        connection.send_header({"status": "OK", "command": "QUIT"})
+                    self._log(context, "SUCCESS", f"{command} completed")
+                    if command == "QUIT":
+                        break
+                except ProtocolError as exc:
+                    self._send_error(connection, exc.code, str(exc))
+                    self._log(context, exc.code, str(exc))
+                    if exc.fatal:
+                        break
+                except socket.timeout:
+                    self._send_error(connection, "TIMEOUT", "Client inactivity timeout")
+                    self._log(context, "TIMEOUT", "Client inactivity timeout")
                     break
-                context.update({key: request.get(key) for key in ("command", "filename", "file_size")})
-                command = request.get("command")
-                if not isinstance(command, str) or command not in ("UPLOAD", "DOWNLOAD", "LIST", "QUIT"):
-                    raise ProtocolError("INVALID_COMMAND", "Expected UPLOAD, DOWNLOAD, LIST or QUIT")
-                if command == "UPLOAD":
-                    self._upload(connection, request, context)
-                elif command == "DOWNLOAD":
-                    self._download(connection, request, context)
-                elif command == "LIST":
-                    connection.send_header({"status": "OK", "command": "LIST", "files": self.storage.list_files()})
-                else:
-                    connection.send_header({"status": "OK", "command": "QUIT"})
-                self._log(context, "SUCCESS", f"{command} completed")
-                if command == "QUIT":
+                except PeerDisconnected as exc:
+                    self._log(context, "INCOMPLETE", str(exc))
                     break
-            except ProtocolError as exc:
-                self._send_error(connection, exc.code, str(exc))
-                self._log(context, exc.code, str(exc))
-                if exc.fatal:
+                except OSError as exc:
+                    if self.stopping and context["command"] is None:
+                        self._log({**peer, "command": "DISCONNECT"}, "DISCONNECTED", "Connection closed on server shutdown")
+                        break
+                    self._send_error(connection, "CONNECTION_OR_IO_ERROR", "Connection or file operation failed")
+                    self._log(context, "CONNECTION_OR_IO_ERROR", str(exc))
                     break
-            except socket.timeout:
-                self._send_error(connection, "TIMEOUT", "Client inactivity timeout")
-                self._log(context, "TIMEOUT", "Client inactivity timeout")
-                break
-            except PeerDisconnected as exc:
-                self._log(context, "INCOMPLETE", str(exc))
-                break
-            except OSError as exc:
-                if self.stopping and context["command"] is None:
-                    self._log({**peer, "command": "DISCONNECT"}, "DISCONNECTED", "Connection closed on server shutdown")
-                    break
-                self._send_error(connection, "CONNECTION_OR_IO_ERROR", "Connection or file operation failed")
-                self._log(context, "CONNECTION_OR_IO_ERROR", str(exc))
-                break
+        finally:
+            self.storage.release_all(connection_id)
 
     def _upload(self, connection, request, context):
         target = self.storage.path_for(request.get("filename"))
@@ -301,7 +292,7 @@ class FileServer:
         ):
             raise ProtocolError("INVALID_CHECKSUM", "sha256 must be 64 hexadecimal characters")
 
-        with self._acquire_file_lock(target.name):
+        with self.storage.locked(request.get("filename"), owner=context.get("connection_id", "")):
             temporary_path = None
             context["transferred_bytes"] = 0
             digest = hashlib.sha256()
@@ -328,18 +319,17 @@ class FileServer:
                     # Do not publish the temporary upload or overwrite an existing file.
                     raise ProtocolError("CHECKSUM_MISMATCH", "Uploaded SHA-256 does not match source checksum")
                 self.storage.commit_upload(temporary_path, target)
-                connection.send_header({
-                    "status": "SUCCESS", "command": "UPLOAD", "filename": target.name,
-                    "file_size": file_size, "sha256": actual_sha256,
-                })
             finally:
                 if temporary_path is not None:
                     temporary_path.unlink(missing_ok=True)
+        connection.send_header({
+            "status": "SUCCESS", "command": "UPLOAD", "filename": target.name,
+            "file_size": file_size, "sha256": actual_sha256,
+        })
 
     def _download(self, connection, request, context):
-        target = self.storage.path_for(request.get("filename"))
-        with self._acquire_file_lock(target.name):
-            with self.storage.open_download(target.name) as stream:
+        with self.storage.locked(request.get("filename"), owner=context.get("connection_id", "")):
+            with self.storage.open_download(request.get("filename")) as stream:
                 file_size = os.fstat(stream.fileno()).st_size
                 context["file_size"] = file_size
                 context["transferred_bytes"] = 0
@@ -361,11 +351,11 @@ class FileServer:
                 connection.sending_payload = False
                 actual_sha256 = digest.hexdigest()
                 context["sha256"] = actual_sha256
-                connection.send_header({
-                    "status": "SUCCESS", "command": "DOWNLOAD",
-                    "filename": request["filename"], "file_size": file_size,
-                    "sha256": actual_sha256,
-                })
+        connection.send_header({
+            "status": "SUCCESS", "command": "DOWNLOAD",
+            "filename": request["filename"], "file_size": file_size,
+            "sha256": actual_sha256,
+        })
 
 
 def main(argv=None):
