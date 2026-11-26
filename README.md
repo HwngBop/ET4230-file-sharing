@@ -206,3 +206,9 @@ Thời gian đo phía Client được tính từ lúc bắt đầu gửi request
 - Lưu minh chứng demo vào `demo/`: ảnh terminal hai máy, Wireshark PCAP, video 3–5 phút khi hoàn thành.
 - Không sửa tay số liệu để làm đẹp biểu đồ; giữ cả raw CSV và phương pháp tính.
 
+
+## 10. Sprint 2 — concurrent test runner
+
+Runner có cấu hình 1/5/10 client, mỗi worker một connection và CSV riêng; tổng hợp sau khi tất cả worker kết thúc. Hướng dẫn chuẩn bị server, chạy Windows/Linux/LAN và tiêu chí concurrency: [report/sprint2-test-plan.md](report/sprint2-test-plan.md).
+
+Server concurrent đã được tích hợp vào `main` qua PR #9; server tuần tự không thể PASS kịch bản nhiều client. Runner không tự thay server. Mẫu đo thật loopback và kết quả kiểm chứng: [report/sprint2-verification.md](report/sprint2-verification.md).

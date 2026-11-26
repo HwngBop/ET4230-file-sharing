@@ -9,16 +9,20 @@ FIELDS = [
 ]
 
 
-def append_result(path, row):
+CONCURRENT_FIELDS = FIELDS + ["client_id", "session_id"]
+
+
+def append_result(path, row, fields=None):
+    fields = FIELDS if fields is None else fields
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a+", newline="", encoding="utf-8") as stream:
         stream.seek(0)
         header = next(csv.reader(stream), None)
-        if header is not None and header != FIELDS:
+        if header is not None and header != fields:
             raise ValueError(f"CSV schema mismatch: {path}; choose a new output file")
         stream.seek(0, 2)
-        writer = csv.DictWriter(stream, fieldnames=FIELDS)
+        writer = csv.DictWriter(stream, fieldnames=fields)
         if header is None:
             writer.writeheader()
         values = {k: (str(v).lower() if type(v) is bool else v) for k, v in row.items()}
