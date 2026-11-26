@@ -1,4 +1,4 @@
-"""Command-line client for the ET4230 TCP file-sharing system (Sprint 1).
+"""Command-line client for the ET4230 TCP file-sharing system (Sprint 2).
 
 From project root: python src/client/client.py
 Commands: connect, upload, download, list, quit, help.
@@ -7,9 +7,11 @@ Commands: connect, upload, download, list, quit, help.
 import argparse
 from contextlib import contextmanager
 import hashlib
+import os
 import re
 import socket
 import sys
+import threading
 from pathlib import Path
 
 SRC_DIR = Path(__file__).resolve().parents[1]
@@ -29,12 +31,38 @@ DEFAULT_PORT = 5000
 SOCKET_TIMEOUT = 30
 CHUNK_SIZE = 65536
 
+# Error contract. RECOVERABLE: the server keeps the connection open, so the next
+# command may be sent. Everything else (including unknown codes) is FATAL: the
+# client closes its socket and the user must run 'connect' again.
+# Classification follows the frozen contract S2-01 v1.0 (section 4.2): SERVER_BUSY is
+# fatal (the server closes the session), FILE_BUSY is recoverable (the session stays
+# open). Do not change it without a new contract version.
+RECOVERABLE_ERROR_CODES = {
+    "INVALID_COMMAND",
+    "INVALID_FILENAME",
+    "INVALID_FILE_SIZE",
+    "FILE_TOO_LARGE",
+    "INVALID_CHECKSUM",
+    "CHECKSUM_MISMATCH",
+    "FILE_NOT_FOUND",
+    "FILE_BUSY",
+}
 FATAL_ERROR_CODES = {
+    "SERVER_BUSY",
     "INVALID_HEADER",
     "HEADER_TOO_LARGE",
     "TIMEOUT",
     "TRANSFER_INCOMPLETE",
     "CONNECTION_OR_IO_ERROR",
+}
+
+ERROR_HINTS = {
+    "SERVER_BUSY": "The server is overloaded; wait a moment, then try again",
+    "FILE_BUSY": "Another transfer is using this file; try again later",
+    "FILE_NOT_FOUND": "Use 'list' to see the files on the server",
+    "CHECKSUM_MISMATCH": "Data was corrupted in transit; the server kept its previous file",
+    "TIMEOUT": "The server stopped waiting for data",
+    "CONNECTION_OR_IO_ERROR": "The server hit a connection or disk error",
 }
 
 HELP_TEXT = """Commands:
@@ -58,8 +86,19 @@ class ServerError(ClientError):
     """The server answered with status = ERROR."""
 
     def __init__(self, code, message):
-        super().__init__(f"Server error {code}: {message}")
         self.code = code
+        self.recoverable = code in RECOVERABLE_ERROR_CODES
+        text = f"Server error {code}: {message}"
+        hint = ERROR_HINTS.get(code)
+        if hint:
+            text += f". {hint}"
+        if not self.recoverable:
+            text += ". Connection closed; use 'connect' to reconnect."
+        super().__init__(text)
+
+
+class TransferInterrupted(ClientError):
+    """The connection was lost while a transfer was in progress; the transfer FAILED."""
 
 
 def format_size(num_bytes):
@@ -92,6 +131,20 @@ def verify_checksum(value, expected):
         raise ChecksumMismatch("CHECKSUM_MISMATCH: received file bytes differ from expected SHA-256")
 
 
+def io_error_code(exc):
+    """Error-contract code for a socket/IO failure detected by the CLIENT itself."""
+    return "TIMEOUT" if isinstance(exc, socket.timeout) else "CONNECTION_OR_IO_ERROR"
+
+
+def label_error(exc):
+    """Human/CSV text that always starts with the contract code for local failures."""
+    if isinstance(exc, socket.timeout):
+        return f"TIMEOUT: no response from server within {SOCKET_TIMEOUT} s"
+    if isinstance(exc, (PeerDisconnected, OSError)):
+        return f"CONNECTION_OR_IO_ERROR: {exc}"
+    return str(exc) or type(exc).__name__
+
+
 class FileClient:
     def __init__(self, csv_path=PROJECT_ROOT / "results/raw/baseline.csv",
                  environment_id=None, chunk_size=CHUNK_SIZE, download_dir=None,
@@ -108,37 +161,56 @@ class FileClient:
         self._provided_environment = environment_id is not None
         self.results_dir = Path(results_dir)
         self.last_result = None
+        self._operation_lock = threading.Lock()
+
+    @contextmanager
+    def exclusive(self):
+        """One FileClient = one socket = one operation at a time.
+
+        Handing a client from one thread to another is fine; using it from two
+        threads at once is a bug, so fail loudly instead of corrupting the stream."""
+        if not self._operation_lock.acquire(blocking=False):
+            raise RuntimeError("FileClient is already in use by another thread; use one FileClient per thread")
+        try:
+            yield
+        finally:
+            self._operation_lock.release()
 
     @contextmanager
     def measured_transfer(self, direction, filename):
-        measurement = Measurement(direction, str(filename), self.chunk_size, self.environment_id)
-        self.last_result = measurement.row
-        try:
-            yield measurement
-            measurement.finish()
-        except BaseException as exc:
-            # A missing/malformed checksum remains unknown, not a mismatch.
-            if isinstance(exc, ChecksumMismatch) or getattr(exc, "code", None) == "CHECKSUM_MISMATCH":
-                measurement.row["checksum_match"] = False
-            measurement.finish(exc)
-            if (measurement.transfer_start is not None
-                    and not (isinstance(exc, ServerError) and exc.code not in FATAL_ERROR_CODES)):
-                self.drop()
-            raise
-        finally:
+        with self.exclusive():
+            measurement = Measurement(direction, str(filename), self.chunk_size, self.environment_id)
+            self.last_result = measurement.row
             try:
-                append_result(self.csv_path, measurement.row)
-            except (OSError, ValueError, TypeError) as exc:
-                raise ClientError(f"CSV LOGGING FAILED ({self.csv_path}): {exc}") from exc
-        print("Transfer completed; SHA-256 MATCH.")
-        print_result(measurement.row["transfer_time_s"], measurement.row["file_size_bytes"])
-        print(f"run_id: {measurement.row['run_id']}; CSV: {self.csv_path}")
+                yield measurement
+                measurement.finish()
+            except BaseException as exc:
+                # A missing/malformed checksum remains unknown, not a mismatch.
+                if isinstance(exc, ChecksumMismatch) or getattr(exc, "code", None) == "CHECKSUM_MISMATCH":
+                    measurement.row["checksum_match"] = False
+                measurement.finish(exc if isinstance(exc, (ClientError, ProtocolError)) else label_error(exc))
+                if (measurement.transfer_start is not None
+                        and not (isinstance(exc, ServerError) and exc.recoverable)):
+                    self.drop()
+                raise
+            finally:
+                try:
+                    append_result(self.csv_path, measurement.row)
+                except (OSError, ValueError, TypeError) as exc:
+                    raise ClientError(f"CSV LOGGING FAILED ({self.csv_path}): {exc}") from exc
+            print("Transfer completed; SHA-256 MATCH.")
+            print_result(measurement.row["transfer_time_s"], measurement.row["file_size_bytes"])
+            print(f"run_id: {measurement.row['run_id']}; CSV: {self.csv_path}")
 
     @property
     def connected(self):
         return self.sock is not None
 
     def connect(self, host, port):
+        with self.exclusive():
+            self._connect(host, port)
+
+    def _connect(self, host, port):
         if self.connected:
             raise ClientError("Already connected. Use 'quit' to disconnect first.")
         try:
@@ -185,12 +257,40 @@ class FileClient:
         if header is None:
             raise PeerDisconnected("Server closed the connection")
         if header.get("status") == "ERROR":
-            code = header.get("code", "UNKNOWN")
-            message = header.get("message", "")
-            if code in FATAL_ERROR_CODES:
+            error = self.server_error(header)
+            if not error.recoverable:
                 self.drop()
-            raise ServerError(code, message)
+            raise error
         return header
+
+    @staticmethod
+    def server_error(header):
+        code = header.get("code")
+        if not isinstance(code, str):
+            code = "UNKNOWN"
+        return ServerError(code, str(header.get("message", "")))
+
+    def send_request(self, header):
+        """Send a request; if the server already hung up, report its ERROR reply if one is waiting."""
+        try:
+            self.conn.send_header(header)
+        except OSError:
+            error = self.pending_server_error()
+            if error is not None:
+                raise error
+            raise
+
+    def pending_server_error(self):
+        error = None
+        try:
+            self.sock.settimeout(1)
+            reply = self.conn.receive_header()
+            if reply is not None and reply.get("status") == "ERROR":
+                error = self.server_error(reply)
+        except (OSError, ProtocolError, PeerDisconnected, ValueError):
+            pass
+        self.drop()  # the send already failed, so the session is unusable
+        return error
 
     @staticmethod
     def expect(header, status, command):
@@ -198,8 +298,12 @@ class FileClient:
             raise ProtocolError("INVALID_HEADER", f"Unexpected response (wanted {status}/{command}): {header}")
 
     def list_files(self):
+        with self.exclusive():
+            self._list_files()
+
+    def _list_files(self):
         self.require_connection()
-        self.conn.send_header({"command": "LIST"})
+        self.send_request({"command": "LIST"})
         header = self.read_response()
         self.expect(header, "OK", "LIST")
         files = header.get("files", [])
@@ -220,31 +324,58 @@ class FileClient:
     def _upload(self, raw_path, measurement):
         self.require_connection()
         path = self.find_local_file(raw_path)
-        file_size = path.stat().st_size
         filename = path.name
-        measurement.row.update(file_name=filename, file_size_bytes=file_size)
-        source_sha256 = sha256_file(path)
-        print(f"Uploading {filename}")
-        print(f"Size: {format_size(file_size)}")
+        # Open and hash the file BEFORE talking to the server: a local problem
+        # (file locked by another program, unreadable) must not cost the session.
+        try:
+            stream = open(path, "rb")
+        except OSError as exc:
+            raise ClientError(
+                f"Cannot read local file {path}: {exc}. It may be in use by another program.") from exc
+        with stream:
+            try:
+                file_size = os.fstat(stream.fileno()).st_size
+                source_sha256 = sha256_file(path)
+            except OSError as exc:
+                raise ClientError(f"Cannot read local file {path}: {exc}") from exc
+            measurement.row.update(file_name=filename, file_size_bytes=file_size)
+            print(f"Uploading {filename}")
+            print(f"Size: {format_size(file_size)}")
 
-        measurement.start()
-        self.conn.send_header({
-            "command": "UPLOAD", "filename": filename,
-            "file_size": file_size, "sha256": source_sha256,
-        })
-        self.expect(self.read_response(), "READY", "UPLOAD")
+            measurement.start()
+            self.send_request({
+                "command": "UPLOAD", "filename": filename,
+                "file_size": file_size, "sha256": source_sha256,
+            })
+            # An ERROR here (FILE_BUSY, SERVER_BUSY, ...) raises: no payload is sent.
+            self.expect(self.read_response(), "READY", "UPLOAD")
 
-        sent = 0
-        with open(path, "rb") as stream:
+            sent = 0
             while sent < file_size:
-                chunk = stream.read(min(self.chunk_size, file_size - sent))
+                try:
+                    chunk = stream.read(min(self.chunk_size, file_size - sent))
+                except OSError as exc:
+                    self.drop()
+                    raise ClientError(f"Cannot read local file during upload ({exc}). Connection closed.") from exc
                 if not chunk:
                     self.drop()
                     raise ClientError("Local file changed during upload. Connection closed.")
-                self.sock.sendall(chunk)
+                try:
+                    self.sock.sendall(chunk)
+                except OSError as exc:
+                    self.drop()
+                    raise TransferInterrupted(
+                        f"{io_error_code(exc)}: connection lost during upload after {sent} of {file_size} bytes ({exc}). "
+                        "Transfer FAILED.") from exc
                 sent += len(chunk)
 
-        confirmation = self.read_response()
+            try:
+                confirmation = self.read_response()
+            except (PeerDisconnected, OSError) as exc:
+                self.drop()
+                raise TransferInterrupted(
+                    f"{io_error_code(exc)}: connection lost before the server confirmed the upload ({exc}). "
+                    "Transfer FAILED: the result is unverified.") from exc
         self.expect(confirmation, "SUCCESS", "UPLOAD")
         try:
             verify_checksum(confirmation.get("sha256"), source_sha256)
@@ -268,7 +399,7 @@ class FileClient:
 
         print(f"Downloading {filename}")
         measurement.start()
-        self.conn.send_header({"command": "DOWNLOAD", "filename": filename})
+        self.send_request({"command": "DOWNLOAD", "filename": filename})
         header = self.read_response()
         self.expect(header, "OK", "DOWNLOAD")
         file_size = header.get("file_size")
@@ -277,28 +408,48 @@ class FileClient:
             raise ClientError("Server sent an invalid file_size. Connection closed.")
         measurement.row["file_size_bytes"] = file_size
 
+        received = 0
         try:
-            received = 0
             digest = hashlib.sha256()
             with open(partial, "wb") as stream:
                 while received < file_size:
-                    chunk = self.conn.receive_chunk(min(self.chunk_size, file_size - received))
+                    try:
+                        chunk = self.conn.receive_chunk(min(self.chunk_size, file_size - received))
+                    except (PeerDisconnected, OSError) as exc:
+                        self.drop()
+                        raise TransferInterrupted(
+                            f"{io_error_code(exc)}: connection lost during download after {received} of {file_size} bytes ({exc}). "
+                            "Transfer FAILED; partial data discarded.") from exc
                     written = stream.write(chunk)
                     if written != len(chunk):
                         raise OSError("Short write while saving downloaded file")
                     digest.update(chunk)
                     received += written
-            confirmation = self.read_response()
+            try:
+                confirmation = self.read_response()
+            except (PeerDisconnected, OSError) as exc:
+                self.drop()
+                raise TransferInterrupted(
+                    f"{io_error_code(exc)}: connection lost before the server confirmed the download ({exc}). "
+                    "Transfer FAILED; partial data discarded.") from exc
             self.expect(confirmation, "SUCCESS", "DOWNLOAD")
+            # Publish only after: all bytes received + SUCCESS + checksum verified.
             verify_checksum(confirmation.get("sha256"), digest.hexdigest())
             measurement.row["checksum_match"] = True
             partial.replace(target)
         except BaseException:
-            partial.unlink(missing_ok=True)
+            try:
+                partial.unlink(missing_ok=True)
+            except OSError:
+                pass  # never let cleanup hide the real error; the old target is untouched
             raise
 
 
     def quit(self):
+        with self.exclusive():
+            self._quit()
+
+    def _quit(self):
         if not self.connected:
             return
         try:
@@ -371,25 +522,32 @@ def run_safely(client, line):
         print(f"Error: {exc}")
     except ClientError as exc:
         print(f"Error: {exc}")
-    except socket.timeout:
+    except socket.timeout as exc:
         client.drop()
-        print("Error: Server did not respond in time. Connection closed.")
+        print(f"Error: {label_error(exc)}. Connection closed; use 'connect' to reconnect.")
     except PeerDisconnected as exc:
         client.drop()
-        print(f"Error: {exc}. Connection closed.")
+        print(f"Error: {label_error(exc)}. Connection closed; use 'connect' to reconnect.")
     except ProtocolError as exc:
         client.drop()
         print(f"Error: Protocol violation from server ({exc}). Connection closed.")
     except OSError as exc:
         client.drop()
-        print(f"Error: Connection or file problem ({exc}). Connection closed.")
+        print(f"Error: {label_error(exc)}. Connection closed; use 'connect' to reconnect.")
     return True
 
 
-def main():
+def build_parser():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--csv", type=Path, default=PROJECT_ROOT / "results/raw/baseline.csv")
     parser.add_argument("--environment", type=Path, help="Existing merged environment JSON")
+    parser.add_argument("--download-dir", type=Path, default=DOWNLOAD_DIR,
+                        help="Folder for downloaded files (use a different one per client instance)")
+    return parser
+
+
+def main():
+    parser = build_parser()
     args = parser.parse_args()
     environment_id = None
     if args.environment:
@@ -401,9 +559,10 @@ def main():
                 raise ValueError("Environment chunk_size_bytes differs from client")
         except (OSError, ValueError, KeyError) as exc:
             parser.error(f"Invalid environment: {exc}")
-    DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    args.download_dir.mkdir(parents=True, exist_ok=True)
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-    client = FileClient(csv_path=args.csv, environment_id=environment_id)
+    client = FileClient(csv_path=args.csv, environment_id=environment_id,
+                        download_dir=args.download_dir)
     print("ET4230 File Sharing Client. Type 'help' for commands.")
     try:
         while True:
