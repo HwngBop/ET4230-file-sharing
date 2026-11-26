@@ -211,4 +211,4 @@ Thời gian đo phía Client được tính từ lúc bắt đầu gửi request
 
 Runner có cấu hình 1/5/10 client, mỗi worker một connection và CSV riêng; tổng hợp sau khi tất cả worker kết thúc. Hướng dẫn chuẩn bị server, chạy Windows/Linux/LAN và tiêu chí concurrency: [report/sprint2-test-plan.md](report/sprint2-test-plan.md).
 
-Server concurrent hiện ở nhánh `cn21-10`; server tuần tự không thể PASS kịch bản nhiều client. Runner không tự thay server. Mẫu đo thật loopback và kết quả kiểm chứng: [report/sprint2-verification.md](report/sprint2-verification.md).
+Server concurrent đã được tích hợp vào `main` qua PR #9; server tuần tự không thể PASS kịch bản nhiều client. Runner không tự thay server. Mẫu đo thật loopback và kết quả kiểm chứng: [report/sprint2-verification.md](report/sprint2-verification.md).

@@ -4,7 +4,7 @@
 
 Runner `scripts/run_concurrent.py` tạo 1, 5 hoặc 10 worker trên một laptop; mỗi worker mở một TCP connection đến server. Không cần 5/10 máy vật lý. Để đo LAN cần ít nhất một máy client và một máy server; chạy localhost chỉ là kiểm chứng loopback.
 
-**Phụ thuộc server:** bản `main` tại `b2e3c98` vẫn phục vụ tuần tự. Server concurrent đã có trên nhánh `cn21-10`, commit `dd74fe8`. Runner không tự đổi server, merge branch hay sửa `main`. Chuẩn bị server bằng nhánh concurrent đã được nhóm review. S2-01/S2-02/S2-03/S2-04 cần nhóm đối chiếu trạng thái trên bảng công việc; trong repo hiện tại đã kiểm chứng được giao thức READY/SUCCESS, SHA-256 và server `cn21-10`.
+**Phụ thuộc server:** phiên bản `main` sau PR #7 và #9 đã có Server concurrent và Storage locking; sau PR #8 có Client Reliability. Runner chạy trên chính các thành phần đã tích hợp. Cần chạy lại full test Python 3.11 và E2E LAN hai máy trước nghiệm thu. Mẫu đo ngày 18/11 là kết quả loopback Linux trên commit lịch sử, không phải bằng chứng nghiệm thu cho phiên bản tích hợp.
 
 Các thay đổi:
 
