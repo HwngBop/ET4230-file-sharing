@@ -148,7 +148,7 @@ Client không bị thoát khi gặp các lỗi dưới đây. Với lỗi recove
 | `Cannot read local file ...` | File local đang bị chương trình khác khóa hoặc không đọc được. Client chưa gửi gì lên server, phiên vẫn mở. Đóng chương trình đang dùng file rồi thử lại |
 | `CONNECTION_OR_IO_ERROR: connection lost during upload/download after X of Y bytes ...` | Mất kết nối giữa lúc truyền (mã là `TIMEOUT:` nếu quá hạn chờ dữ liệu). Lượt truyền bị đánh dấu `FAILED`, file tải dở bị xóa. Dùng `connect` để tạo phiên mới và truyền lại từ đầu |
 | `... the result is unverified` | Mất kết nối sau khi gửi hết dữ liệu nhưng trước khi server xác nhận. Không biết server đã lưu hay chưa: dùng `connect`, `list` để kiểm tra rồi upload lại nếu cần |
-| `TIMEOUT: no response from server within 30 s. Connection closed; ...` | Server không phản hồi trong 30 giây. Client đóng kết nối. Gõ lại `connect` |
+| `TIMEOUT: no response from server within N s. Connection closed; ...` | Server không phản hồi trong N giây, với N là `socket_timeout` của Client (mặc định 30). Client đóng kết nối. Gõ lại `connect` |
 | `CONNECTION_OR_IO_ERROR: Server closed the connection. Connection closed; ...` | Server đóng kết nối mà không gửi thông báo lỗi. Client không coi đó là thành công. Gõ lại `connect` |
 | `CONNECTION_OR_IO_ERROR: ...` (các nội dung khác) | Lỗi socket hoặc ổ đĩa do Client tự phát hiện (bị reset, ngắt mạng, không ghi được file). Lượt truyền đang chạy bị `FAILED`. Gõ lại `connect` |
 
@@ -228,7 +228,54 @@ File CSV không được thiết kế cho nhiều tiến trình ghi cùng lúc, 
 
 Khi nhiều client cùng upload, mỗi client nên dùng tên file khác nhau. Hai client cùng truy cập một tên file sẽ nhận `FILE_BUSY` (recoverable).
 
-## 12. Giới hạn hiện tại
+**Dùng `FileClient` từ script (ví dụ `scripts/run_concurrent.py`).** Mỗi worker tạo một `FileClient` riêng, không chia sẻ giữa các thread. Các tham số của hàm khởi tạo:
+
+| Tham số | Mặc định | Ý nghĩa |
+| --- | --- | --- |
+| `csv_path` | `results/raw/baseline.csv` | File CSV ghi kết quả của Client này |
+| `download_dir` | `client_data/downloads` | Thư mục tải về, mỗi Client một thư mục riêng |
+| `num_clients` | `1` | Số client trong lần chạy, ghi vào CSV |
+| `client_id`, `session_id` | `None` | Định danh ghi vào CSV khi được truyền |
+| `csv_fields` | `None` | Danh sách cột CSV (runner dùng bộ cột mở rộng) |
+| `socket_timeout` | `30` | Số giây tối đa chờ Server; quá hạn thì báo `TIMEOUT` |
+| `environment_id`, `chunk_size`, `auto_environment`, `results_dir` | xem mã nguồn | Như Sprint 1 |
+
+Các tham số này được khóa bằng `tests/test_client_runner_compat.py`: nếu runner hoặc Client đổi chữ ký mà làm lệch nhau, test sẽ báo lỗi.
+
+## 12. Kiểm thử tự động
+
+Chạy tại thư mục gốc project (venv đã kích hoạt):
+
+```powershell
+$env:PYTHONPATH = "src"
+python -m pytest -q
+```
+
+Các file test của Client:
+
+| File | Dùng gì | Kiểm tra |
+| --- | --- | --- |
+| `tests/test_client_reliability.py` | Server giả | Từng mã lỗi, `.part`, checksum, CSV `FAILED`, khóa thao tác, reconnect |
+| `tests/test_client_real_server.py` | `FileServer` và Storage thật, TCP proxy cắt kết nối | `SERVER_BUSY`, `FILE_BUSY` rồi `LIST` và retry, upload/download bị ngắt giữa chừng, reconnect, hồi quy Sprint 1 |
+| `tests/test_client_runner_compat.py` | Runner thật, Server giả | Chữ ký `FileClient` khớp với `scripts/run_concurrent.py`, cổng READY, dòng CSV `FAILED` |
+| `tests/test_client_timeout_label.py` | Server im lặng | Thông báo `TIMEOUT` nêu đúng `socket_timeout` của từng Client |
+
+Nếu `tests/test_server.py::ConfigTests::test_cli_overrides_json_and_resolves_paths` báo lỗi trên máy có tên người dùng Windows chứa dấu cách (đường dẫn dạng `HITCC~1`), đó là lỗi môi trường của test Server, không liên quan Client.
+
+## 13. Kịch bản kiểm thử lỗi trên hai máy
+
+Máy Server chạy Server, máy Client chạy Client (xem mục 7). Mỗi Client chạy ở một cửa sổ terminal riêng và dùng `--csv` và `--download-dir` riêng (mục 11). Lệnh `Get-FileHash`, `Import-Csv`, `Get-ChildItem` gõ ở PowerShell, còn `connect`, `upload`, `download`, `list`, `quit` gõ ở dấu nhắc `>` của Client.
+
+| Ca | Cách làm | Kết quả đúng |
+| --- | --- | --- |
+| `SERVER_BUSY` | Chạy Server với `--max-clients 2 --client-timeout 120`. Mở 2 Client, mỗi Client `connect` rồi `list` và để nguyên. Client thứ 3 `connect` rồi `list` và `upload` | `connect` vẫn báo `Connected to server.`. `list` và `upload` báo `Server error SERVER_BUSY`, Client tự đóng kết nối, không in `SHA-256 MATCH`, Server không có file mới, CSV `FAILED` không có throughput. Một Client `quit` thì Client thứ 3 gõ lại `connect` và dùng được |
+| `FILE_BUSY` | Client A upload file lớn (vài trăm MiB). Trong lúc đó Client B upload file cùng tên rồi gõ `list` | B báo `Server error FILE_BUSY`, không gửi dữ liệu file, `list` chạy ngay trên cùng kết nối. Khi A xong, B upload lại thành công. CSV của B có dòng `FAILED` rồi `SUCCESS` |
+| Upload bị ngắt | Upload file lớn, ngắt mạng ở máy Client giữa lúc truyền | Báo `CONNECTION_OR_IO_ERROR` hoặc `TIMEOUT`, không in `SHA-256 MATCH`, CSV `FAILED`. Sau khoảng 30 giây Server không còn file dở, không còn file `.part`, và log Server có dòng `INCOMPLETE` hoặc `TIMEOUT` của lượt truyền đó. `connect` lại và upload lại thành công |
+| Download bị ngắt | Tải một file hoàn chỉnh trước, ghi lại hash. Tải lại và ngắt mạng giữa chừng | Báo lỗi, không in `SHA-256 MATCH`, file `.part` bị xóa, hash của file cũ không đổi, CSV `FAILED`. `connect` lại và tải lại thành công |
+
+Cách ngắt mạng: bật Airplane mode của Windows hoặc dùng `Disable-NetAdapter` và `Enable-NetAdapter` (cần PowerShell chạy bằng Administrator). Chỉ ngắt ở máy Client, không tắt Server.
+
+## 14. Giới hạn hiện tại
 
 - Chưa có TLS: dữ liệu truyền qua mạng **không được mã hóa**. Không dùng để truyền dữ liệu nhạy cảm.
 - Chưa có resume, tự động thử lại, progress bar nâng cao, đăng nhập và GUI. Mỗi Client chỉ thực hiện một lượt truyền tại một thời điểm; muốn truyền song song thì chạy nhiều Client.
