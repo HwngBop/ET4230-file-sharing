@@ -4,6 +4,7 @@ import csv
 import hashlib
 import ipaddress
 import json
+import math
 import os
 import shutil
 import sys
@@ -13,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -24,6 +25,56 @@ from common.environment import NETWORK_TYPES, collect_host, read_host
 
 def write_json(path, value):
     Path(path).write_text(json.dumps(value, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def validate_worker_rows(rows, expected_pairs, *, client_id, session_id,
+                         environment_id, num_clients, expected_sizes=None):
+    """Reject CSVs that could otherwise hide a client integration mismatch."""
+    errors = []
+    pairs = [(row.get("direction"), row.get("file_name")) for row in rows]
+    if len(pairs) != len(expected_pairs) or set(pairs) != set(expected_pairs):
+        errors.append("Missing or duplicate planned transfer")
+    for row in rows:
+        try:
+            UUID(row["run_id"])
+            stamp = datetime.fromisoformat(row["timestamp"])
+            if stamp.utcoffset() is None:
+                raise ValueError("Timestamp must include a timezone")
+        except (KeyError, TypeError, ValueError, AttributeError):
+            errors.append("CSV run_id must be a UUID and timestamp must include a timezone")
+        pair = (row.get("direction"), row.get("file_name"))
+        size = row.get("file_size_bytes")
+        if expected_sizes is not None and pair in expected_sizes:
+            if (row.get("status") == "SUCCESS" or size not in (None, "")):
+                if size != str(expected_sizes[pair]):
+                    errors.append("CSV file_size_bytes differs from source fixture")
+        expected = {"client_id": client_id, "session_id": session_id,
+                    "environment_id": environment_id, "num_clients": str(num_clients),
+                    "chunk_size_bytes": "65536"}
+        if any(row.get(key) != value for key, value in expected.items()):
+            errors.append("CSV client/session/environment/configuration mismatch")
+        status = row.get("status")
+        if status == "SUCCESS":
+            try:
+                size = int(row["file_size_bytes"])
+                elapsed = float(row["transfer_time_s"])
+                rate = float(row["throughput_mbps"])
+                calculated = size * 8 / (elapsed * 1_000_000)
+                valid = (size >= 0 and elapsed > 0 and math.isfinite(elapsed)
+                         and math.isfinite(rate) and rate >= 0
+                         and math.isclose(rate, calculated, rel_tol=1e-12, abs_tol=1e-12))
+            except (KeyError, TypeError, ValueError, ZeroDivisionError, OverflowError):
+                valid = False
+            if row.get("checksum_match") != "true" or not valid:
+                errors.append("SUCCESS row lacks verified checksum or valid Mbps metric")
+        elif status == "FAILED":
+            if row.get("throughput_mbps") not in (None, ""):
+                errors.append("FAILED row must not contain throughput")
+            if not row.get("error_message"):
+                errors.append("FAILED row must contain an error_message")
+        else:
+            errors.append("Unknown transfer status")
+    return sorted(set(errors))
 
 
 class ReadyGate:
@@ -241,6 +292,15 @@ def run_scenario(host, port=5000, num_clients=5, files_dir=ROOT / "client_data/u
                 rows = list(reader)
                 if reader.fieldnames != CONCURRENT_FIELDS:
                     raise ValueError("Unexpected worker CSV schema")
+            expected_pairs = [(direction, f"s2_{session_id}_{client_id}_{source.name}")
+                              for source in files
+                              for direction in (("upload", "download") if download else ("upload",))]
+            result["errors"].extend(validate_worker_rows(rows, expected_pairs,
+                client_id=client_id, session_id=session_id,
+                environment_id=environment_id, num_clients=num_clients,
+                expected_sizes={(direction, f"s2_{session_id}_{client_id}_{source.name}"):
+                                source_sizes[source.name] for source in files
+                                for direction in (("upload", "download") if download else ("upload",))}))
             result["row_count"] = len(rows)
             result["successful_transfers"] = sum(r["status"] == "SUCCESS" and r["checksum_match"] == "true" for r in rows)
             if len(rows) != result["expected_rows"]:
