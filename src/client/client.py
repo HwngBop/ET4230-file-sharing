@@ -136,10 +136,10 @@ def io_error_code(exc):
     return "TIMEOUT" if isinstance(exc, socket.timeout) else "CONNECTION_OR_IO_ERROR"
 
 
-def label_error(exc):
+def label_error(exc, timeout=SOCKET_TIMEOUT):
     """Human/CSV text that always starts with the contract code for local failures."""
     if isinstance(exc, socket.timeout):
-        return f"TIMEOUT: no response from server within {SOCKET_TIMEOUT} s"
+        return f"TIMEOUT: no response from server within {timeout:g} s"
     if isinstance(exc, (PeerDisconnected, OSError)):
         return f"CONNECTION_OR_IO_ERROR: {exc}"
     return str(exc) or type(exc).__name__
@@ -200,7 +200,7 @@ class FileClient:
                 # A missing/malformed checksum remains unknown, not a mismatch.
                 if isinstance(exc, ChecksumMismatch) or getattr(exc, "code", None) == "CHECKSUM_MISMATCH":
                     measurement.row["checksum_match"] = False
-                measurement.finish(exc if isinstance(exc, (ClientError, ProtocolError)) else label_error(exc))
+                measurement.finish(exc if isinstance(exc, (ClientError, ProtocolError)) else label_error(exc, self.socket_timeout))
                 if (measurement.transfer_start is not None
                         and not (isinstance(exc, ServerError) and exc.recoverable)):
                     self.drop()
@@ -536,16 +536,16 @@ def run_safely(client, line):
         print(f"Error: {exc}")
     except socket.timeout as exc:
         client.drop()
-        print(f"Error: {label_error(exc)}. Connection closed; use 'connect' to reconnect.")
+        print(f"Error: {label_error(exc, client.socket_timeout)}. Connection closed; use 'connect' to reconnect.")
     except PeerDisconnected as exc:
         client.drop()
-        print(f"Error: {label_error(exc)}. Connection closed; use 'connect' to reconnect.")
+        print(f"Error: {label_error(exc, client.socket_timeout)}. Connection closed; use 'connect' to reconnect.")
     except ProtocolError as exc:
         client.drop()
         print(f"Error: Protocol violation from server ({exc}). Connection closed.")
     except OSError as exc:
         client.drop()
-        print(f"Error: {label_error(exc)}. Connection closed; use 'connect' to reconnect.")
+        print(f"Error: {label_error(exc, client.socket_timeout)}. Connection closed; use 'connect' to reconnect.")
     return True
 
 
