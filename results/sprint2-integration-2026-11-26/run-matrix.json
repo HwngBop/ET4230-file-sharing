@@ -1,0 +1,88 @@
+{
+  "date": "2026-11-26",
+  "main_reference": "3c5373116525d6eb52c125d808eef7343026dd8a",
+  "network": "loopback",
+  "os": "Linux",
+  "windows_lan_acceptance": "PENDING",
+  "note": "Python 3.11 full CSVs included; Python 3.12 raw sessions retained locally. No Windows or LAN claim.",
+  "runs": [
+    {
+      "python_version": "3.12.14",
+      "num_clients": 1,
+      "session_id": "62806b75-1c4c-4140-9e80-bd3c6ee34edb",
+      "environment_id": "ab2aa21a-7e1c-4585-8a42-a8572e9a903b",
+      "collected_at": "2026-11-26T14:26:52.600196+00:00",
+      "status": "PASS",
+      "exit_code": 0,
+      "expected_rows": 6,
+      "actual_rows": 6,
+      "all_ready_before_payload": true,
+      "shared_payload_completion_overlap_s": 0.031041267999995625
+    },
+    {
+      "python_version": "3.12.14",
+      "num_clients": 5,
+      "session_id": "8aecf288-eec5-420b-862f-3f6118c23f4e",
+      "environment_id": "ce48394a-ab1c-49c0-ab16-8acd67bfc21b",
+      "collected_at": "2026-11-26T14:26:53.581799+00:00",
+      "status": "PASS",
+      "exit_code": 0,
+      "expected_rows": 30,
+      "actual_rows": 30,
+      "all_ready_before_payload": true,
+      "shared_payload_completion_overlap_s": 0.05758154200000831
+    },
+    {
+      "python_version": "3.12.14",
+      "num_clients": 10,
+      "session_id": "022f9c60-3747-4e5c-849e-e70668034d19",
+      "environment_id": "a6190b11-5a3e-405e-832d-72d6aa98cf35",
+      "collected_at": "2026-11-26T14:26:54.956555+00:00",
+      "status": "PASS",
+      "exit_code": 0,
+      "expected_rows": 60,
+      "actual_rows": 60,
+      "all_ready_before_payload": true,
+      "shared_payload_completion_overlap_s": 0.09607459899999071
+    },
+    {
+      "python_version": "3.11.17",
+      "num_clients": 1,
+      "session_id": "684560c7-8438-4532-baae-4892b08b2abc",
+      "environment_id": "9c53a64a-faca-4e35-806f-adfac43487e4",
+      "collected_at": "2026-11-26T14:30:33.062506+00:00",
+      "status": "PASS",
+      "exit_code": 0,
+      "expected_rows": 6,
+      "actual_rows": 6,
+      "all_ready_before_payload": true,
+      "shared_payload_completion_overlap_s": 0.07940761100002192
+    },
+    {
+      "python_version": "3.11.17",
+      "num_clients": 5,
+      "session_id": "5c0e2a2d-2472-41e6-b37e-14f57dac6821",
+      "environment_id": "c3cfbc5e-08f9-49bb-a275-9b5bbf756955",
+      "collected_at": "2026-11-26T14:30:34.083775+00:00",
+      "status": "PASS",
+      "exit_code": 0,
+      "expected_rows": 30,
+      "actual_rows": 30,
+      "all_ready_before_payload": true,
+      "shared_payload_completion_overlap_s": 0.06284524300002658
+    },
+    {
+      "python_version": "3.11.17",
+      "num_clients": 10,
+      "session_id": "4a039341-a83e-420d-b8ac-32470effdee5",
+      "environment_id": "2893b4cd-64d6-41d9-a219-8f2fc46a7879",
+      "collected_at": "2026-11-26T14:30:35.688153+00:00",
+      "status": "PASS",
+      "exit_code": 0,
+      "expected_rows": 60,
+      "actual_rows": 60,
+      "all_ready_before_payload": true,
+      "shared_payload_completion_overlap_s": 0.04466807400001471
+    }
+  ]
+}

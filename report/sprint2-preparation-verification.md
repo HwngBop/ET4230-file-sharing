@@ -1,5 +1,7 @@
 # CN21-13 — Kiểm chứng phần chuẩn bị độc lập
 
+> Bản ghi lịch sử. Kiểm chứng source đã tích hợp ngày 26/11: [kết quả mới](sprint2-integration-verification.md).
+
 Ngày chạy: 23/11/2026. Nhánh: `ha-nguyet`. Chỉ thay đổi runner và test runner; không ghép PR #8, không rebase, không sửa client.py, Server, Storage hoặc wire protocol.
 
 ## Thay đổi thực thi

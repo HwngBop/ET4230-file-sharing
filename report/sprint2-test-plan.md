@@ -2,11 +2,9 @@
 
 ## 1. Phạm vi và phụ thuộc
 
-**Cập nhật điều phối 23/11:** Backend chốt `locked(filename, owner=connection_id)`. PR #8 còn OPEN nên chưa tích hợp cuối/rebase runner. [Kế hoạch theo dependency](sprint2-execution-plan.md) xác định bước nào được phép thực hiện; các lệnh với server a07b950 dưới đây chỉ kiểm chứng bản server riêng, không phải nghiệm thu Backend mới.
+**Cập nhật 26/11:** PR #7 (Storage), #9 (Server), #8 (Client Reliability) và #6 (runner) đã merge vào main tại 3c53731. Nhánh ha-nguyet đã đồng bộ source đã merge, giữ các kiểm tra CSV bổ sung. Các lệnh dưới đây chạy Server/Client trong cùng checkout đã tích hợp, không phải ghép các nhánh feature riêng.
 
-Runner `scripts/run_concurrent.py` tạo 1, 5 hoặc 10 worker trên một laptop; mỗi worker mở một TCP connection đến server. Không cần 5/10 máy vật lý. Để đo LAN cần ít nhất một máy client và một máy server; chạy localhost chỉ là kiểm chứng loopback.
-
-**Phụ thuộc server:** bản `main` tại `b2e3c98` vẫn phục vụ tuần tự. Server concurrent đã có trên nhánh `cn21-10`, commit `a07b950`. Runner không tự đổi server, merge branch hay sửa `main`. Chuẩn bị server bằng nhánh concurrent đã được nhóm review. Mapping theo contract: S2-01/CN21-9 (Hưng), S2-02/CN21-10 (Server), S2-03/CN21-11 (Client), S2-04/CN21-12 (Storage), S2-05/CN21-13 (runner); trạng thái review/tích hợp cần nhóm xác nhận; trong repo hiện tại đã kiểm chứng được giao thức READY/SUCCESS, SHA-256 và server `cn21-10`.
+Runner tạo 1/5/10 worker trên một laptop. Kiểm chứng LAN vẫn cần hai máy; localhost không thay minh chứng LAN. PR #10 còn OPEN, không thuộc source được kiểm chứng ở đây. Kết quả hiện tại: [sprint2-integration-verification.md](sprint2-integration-verification.md).
 
 Các thay đổi:
 
@@ -17,7 +15,7 @@ Các thay đổi:
 - `tests/test_concurrent_runner.py`: các ca chấp nhận, lỗi và server tuần tự.
 - `results/sprint2-samples/`: mẫu từ chạy thật loopback, không chứa địa chỉ LAN, hostname, CPU hay RAM cụ thể.
 
-Hướng dẫn cmd Windows từng bước nằm trong [README.md](../README.md). Client/runner dùng nhánh `ha-nguyet`; server dùng thư mục riêng từ `cn21-10`.
+Hướng dẫn cmd Windows từng bước nằm trong [README.md](../README.md). Server và runner dùng cùng checkout nhánh `ha-nguyet`, mở hai terminal tại cùng thư mục gốc.
 
 ## 2. Chuẩn bị file
 
@@ -33,14 +31,7 @@ Nếu file đã tồn tại, dùng lại file đó; chỉ thêm `--force` khi ch
 
 ## 3. Chuẩn bị server
 
-Cửa sổ terminal server phải đứng trong checkout của nhánh concurrent. Không chuyển nhánh khi working tree có thay đổi chưa lưu. Có thể dùng hai thư mục repo riêng cho server và runner.
-
-Nếu đã có checkout sạch của server:
-
-```text
-git fetch origin
-git switch cn21-10
-```
+Mở terminal server tại thư mục gốc checkout ha-nguyet đã tích hợp. Không chuyển nhánh giữa khi server chạy. Không cần git switch cn21-10 hoặc copy source Client/Storage từ PR đang mở.
 
 Trên server, export thông tin **từ đúng máy đang chạy server**, chọn IP/mạng thực tế. Với localhost:
 
@@ -96,7 +87,7 @@ Không cung cấp metadata server vẫn chạy được nhưng các trường kh
 
 ## 5. Quy trình LAN hai máy
 
-1. Server dùng code concurrent đã được nhóm duyệt; client dùng nhánh runner. Cùng protocol READY/SUCCESS và checksum.
+1. Server và client dùng cùng revision của nhánh ha-nguyet đã tích hợp. Giữ protocol READY/SUCCESS và checksum.
 2. Cả hai máy cùng LAN/Wi-Fi. Lấy IPv4 server bằng `ipconfig` trên Windows hoặc `ip addr` trên Linux.
 3. Trên server export metadata với IP thật, mạng Wi-Fi/Ethernet thực tế; chạy server `--max-clients 10`.
 4. Copy JSON export server sang máy client, ví dụ `results/s2-server-host.json`.
@@ -200,34 +191,17 @@ Linux:
 PYTHONPATH=src python -m unittest discover -s tests -v
 ```
 
-Khi chạy độc lập trên main, test runner dùng fixture threaded **chỉ trong test** để kiểm tra giao thức. Nó không thay server production. Để chạy lại các test đó bằng server dependency thật, dùng checkout nhánh `cn21-10` ở thư mục riêng:
-
-Windows (thay đường dẫn bằng đường dẫn thật):
-
-```powershell
-$env:CONCURRENT_SERVER_FILE = "C:\Projects\ET4230-server\src\server\server.py"
-$env:PYTHONPATH = "src"
-python -m unittest discover -s tests -p test_concurrent_runner.py -v
-Remove-Item Env:CONCURRENT_SERVER_FILE
-```
-
-Linux:
-
-```bash
-CONCURRENT_SERVER_FILE=/path/to/ET4230-server/src/server/server.py PYTHONPATH=src python -m unittest discover -s tests -p test_concurrent_runner.py -v
-```
+Test runner mặc định dùng FileServer/FileStorage production trong chính checkout. SequentialFileServer chỉ là fixture đối chứng âm. Không cần CONCURRENT_SERVER_FILE, trừ khi chủ động kiểm tra một implementation khác.
 
 Không cần cài pytest. Nếu đã cài dependencies nhóm thì có thể dùng pytest. Bộ test giữ sentinel CSV Sprint 1 không đổi, so sánh byte file upload/download và kiểm tra các đường lỗi. Chi tiết kết quả thực tế trong [sprint2-verification.md](sprint2-verification.md).
 
 ## 10. Tương thích FILE_BUSY
 
-Server `a07b950` có nhánh trả FILE_BUSY nếu storage cung cấp try_lock_file. Theo điều phối mới, API đích là locked(filename, owner=connection_id); Storage PR #7 đã có locked nhưng Server chưa gọi API đó. Các test server hiện bổ sung helper riêng. Không coi test fixture là bằng chứng khóa production. Runner dùng tên khác nhau theo worker/phiên; test client bổ sung kiểm tra FILE_BUSY ở cả upload/download được ghi FAILED, throughput trống và cùng socket có thể thử lại thành công. Đây là kiểm chứng xử lý response ở client, không phải triển khai khóa trong storage.
+Source tích hợp dùng FileStorage.locked(filename, owner=connection_id) trước READY/OK và release_all ở finally của worker. Suite test_server_file_busy dùng Server/Storage thật. Test runner giữ các ca lỗi recoverable; các test inject response chỉ chứng minh xử lý client, không thay test khóa thật.
 
-## 11. Review frozen contract
+## 11. Review contract và nghiệm thu
 
-Đối chiếu đầy đủ phạm vi CN21-13 và review gate: [sprint2-contract-review.md](sprint2-contract-review.md). Khi ghép client.py, runner kiểm tra client/session/environment IDs, num_clients/chunk và metric từng dòng thay vì chỉ đếm header/số dòng. CSV sai cấu hình hoặc SUCCESS có metric không hữu hạn phải làm kịch bản FAIL.
-
-Không tự sửa error contract thuộc owner Client hoặc interface Storage. Bản code đã kiểm chứng loopback vẫn chờ review tích hợp, Windows/Python 3.11 và LAN trước DONE.
+Đối chiếu đầy đủ CN21-13: [sprint2-contract-review.md](sprint2-contract-review.md). Điều kiện chờ PR #8 đã đạt; regression bản tích hợp chạy lại độc lập theo [sprint2-integration-verification.md](sprint2-integration-verification.md). Không suy rộng mẫu lịch sử sang revision mới. Windows/LAN và review các cập nhật riêng của ha-nguyet vẫn là gate còn mở.
 
 ## 12. Kiểm tra CSV chuẩn bị trước tích hợp
 

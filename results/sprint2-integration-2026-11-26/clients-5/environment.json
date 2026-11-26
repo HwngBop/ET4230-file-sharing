@@ -1,0 +1,90 @@
+{
+  "environment_id": "c3cfbc5e-08f9-49bb-a275-9b5bbf756955",
+  "session_id": "5c0e2a2d-2472-41e6-b37e-14f57dac6821",
+  "collected_at": "2026-11-26T14:30:34.083775+00:00",
+  "client": {
+    "role": "client",
+    "collected_at": "2026-11-26T14:30:34.093219+00:00",
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "python_version": "3.11.17",
+    "ip": "127.0.0.1",
+    "network_type": "loopback",
+    "chunk_size_bytes": 65536,
+    "commit_sha": "162032423a9aed2e71149cf91daf41516cd3d405",
+    "working_tree_dirty": true
+  },
+  "server": {
+    "role": "server",
+    "collected_at": "2026-11-26T14:30:32.906208+00:00",
+    "os": "Linux-6.18.57-x86_64-with-glibc2.41",
+    "python_version": "3.11.17",
+    "ip": "127.0.0.1",
+    "network_type": "loopback",
+    "chunk_size_bytes": 65536,
+    "commit_sha": "162032423a9aed2e71149cf91daf41516cd3d405",
+    "working_tree_dirty": true,
+    "integrated_main_reference": "3c5373116525d6eb52c125d808eef7343026dd8a",
+    "server_source_sha256": {
+      "src/server/server.py": "c926ab87c24a5de93355a2749b0c89bdfde15a76b2b888ef57431bc263dfcbba",
+      "src/server/storage.py": "318ea744e9ebcad169aee34beb88dff17b890c76fa2f91034b2f0c28b8d8fb3d",
+      "src/server/config.py": "4ac48172b06038b464d47763cbbddafa7aebdc031523650a2bfeebc5b89a50de",
+      "src/common/protocol.py": "378c72ee03fdcc298b3788b244683f911f8ce4b6682937a1b115b96f1ebd1dc7"
+    },
+    "max_clients": 10
+  },
+  "num_clients": 5,
+  "host": "127.0.0.1",
+  "port": 36671,
+  "chunk_size_bytes": 65536,
+  "bandwidth_limit_mbps": "unlimited",
+  "bytes_per_MB": 1000000,
+  "timing_method": "Sprint 1 request-to-completion timing; first upload INCLUDES READY gate wait. Not an unmodified Sprint 1 performance baseline.",
+  "concurrency_method": "All first-upload READY replies before payload release; READY-to-completion intervals must overlap.",
+  "timeout_s": 30,
+  "sync_timeout_s": 5,
+  "same_host": true,
+  "server_metadata_complete": true,
+  "source_sha256": {
+    "scripts/run_concurrent.py": "c8986c05b5c4a7e802ce2f7cb56f4648bdaa637acb31fbaf48ee7902959fac30",
+    "src/client/client.py": "32cc89bad67ecfbfd9c94e6df5c604751efb165b6abdf233276b471688c0d640",
+    "src/common/measurement.py": "c956ee05093f04c0e8de8d719acbad506ea37cfaa8fb8485b340949eae3d6e9c",
+    "src/common/csv_logger.py": "552c30e70e8d7e162b3dda5aa25ff2caf7f4cc26c65c6fae19cd4b8bac742dd8"
+  },
+  "source_files": [
+    {
+      "file_name": "test_10MB.bin",
+      "file_size_bytes": 10000000
+    },
+    {
+      "file_name": "test_1MB.bin",
+      "file_size_bytes": 1000000
+    },
+    {
+      "file_name": "test_50MB.bin",
+      "file_size_bytes": 50000000
+    }
+  ],
+  "client_socket_addresses": [
+    [
+      "127.0.0.1",
+      39558
+    ],
+    [
+      "127.0.0.1",
+      39574
+    ],
+    [
+      "127.0.0.1",
+      39548
+    ],
+    [
+      "127.0.0.1",
+      39550
+    ],
+    [
+      "127.0.0.1",
+      39590
+    ]
+  ],
+  "public_copy_note": "Hardware details omitted; timings, source hashes and loopback addresses retained."
+}

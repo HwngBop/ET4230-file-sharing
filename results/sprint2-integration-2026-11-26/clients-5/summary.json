@@ -1,0 +1,341 @@
+{
+  "session_id": "5c0e2a2d-2472-41e6-b37e-14f57dac6821",
+  "environment_id": "c3cfbc5e-08f9-49bb-a275-9b5bbf756955",
+  "status": "PASS",
+  "num_clients": 5,
+  "expected_rows": 30,
+  "actual_rows": 30,
+  "errors": [],
+  "concurrency": {
+    "status": "PASS",
+    "applicable": true,
+    "method": "first upload: READY-to-completion overlap and all READY before first payload",
+    "all_ready_before_payload": true,
+    "shared_processing_overlap_s": 0.0632705620000138,
+    "shared_payload_completion_overlap_s": 0.06284524300002658,
+    "ready_gate_broken": false,
+    "ready_times_s": {
+      "client-01": 419.398020395,
+      "client-04": 419.402579527,
+      "client-05": 419.410001307,
+      "client-02": 419.417974148,
+      "client-03": 419.418327685
+    },
+    "payload_release_times_s": {
+      "client-03": 419.418379248,
+      "client-04": 419.418401837,
+      "client-01": 419.418463306,
+      "client-02": 419.418614874,
+      "client-05": 419.418753004
+    },
+    "clock": "perf_counter on one runner process; not comparable across hosts",
+    "note": "Demonstrates concurrent application dispatch/waiting, not parallel CPU execution or wire-level packet overlap."
+  },
+  "workers": [
+    {
+      "client_id": "client-01",
+      "session_id": "5c0e2a2d-2472-41e6-b37e-14f57dac6821",
+      "status": "PASS",
+      "errors": [],
+      "expected_rows": 6,
+      "local_address": [
+        "127.0.0.1",
+        39558
+      ],
+      "server_address": [
+        "127.0.0.1",
+        36671
+      ],
+      "transfers": [
+        {
+          "run_id": "69ad8af7-a57e-4c58-ab92-1ce119b59574",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.395058514,
+          "transfer_end_s": 419.481598247
+        },
+        {
+          "run_id": "00a6ac10-433c-4503-ad51-ebdd59e61f08",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.481949449,
+          "transfer_end_s": 419.59551859
+        },
+        {
+          "run_id": "48f2c486-553a-491a-91a4-a5880c50a62d",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.598694432,
+          "transfer_end_s": 419.604515472
+        },
+        {
+          "run_id": "e7e7fa20-b037-4e29-9abb-dfd99c41f235",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.604889575,
+          "transfer_end_s": 419.656276179
+        },
+        {
+          "run_id": "d8b0e912-5423-4c11-bc83-30a8ce513553",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.763230899,
+          "transfer_end_s": 420.219320177
+        },
+        {
+          "run_id": "e75af557-7624-4b72-b772-fdbeb8bce14d",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 420.253023631,
+          "transfer_end_s": 420.719986779
+        }
+      ],
+      "row_count": 6,
+      "successful_transfers": 6
+    },
+    {
+      "client_id": "client-02",
+      "session_id": "5c0e2a2d-2472-41e6-b37e-14f57dac6821",
+      "status": "PASS",
+      "errors": [],
+      "expected_rows": 6,
+      "local_address": [
+        "127.0.0.1",
+        39574
+      ],
+      "server_address": [
+        "127.0.0.1",
+        36671
+      ],
+      "transfers": [
+        {
+          "run_id": "84e1fc37-6989-481e-a665-9934dd5e1a69",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.417131578,
+          "transfer_end_s": 419.508374625
+        },
+        {
+          "run_id": "ad6c2aad-f36e-4f27-8474-b6b30f23fd20",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.509118612,
+          "transfer_end_s": 419.660995666
+        },
+        {
+          "run_id": "82b9a9b1-1b6e-4c77-8ff7-c2aa6bde63f1",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.662590397,
+          "transfer_end_s": 419.666286801
+        },
+        {
+          "run_id": "05f32ab9-07ed-44c3-91e1-0d8b4f4e7bb6",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.666751134,
+          "transfer_end_s": 419.720444912
+        },
+        {
+          "run_id": "0900b3fa-97ef-4d99-8127-474ba4a7981d",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.888712737,
+          "transfer_end_s": 420.501894292
+        },
+        {
+          "run_id": "9806bcc3-cc2a-446f-afc2-d4ba14c47cd1",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 420.502781061,
+          "transfer_end_s": 420.893408565
+        }
+      ],
+      "row_count": 6,
+      "successful_transfers": 6
+    },
+    {
+      "client_id": "client-03",
+      "session_id": "5c0e2a2d-2472-41e6-b37e-14f57dac6821",
+      "status": "PASS",
+      "errors": [],
+      "expected_rows": 6,
+      "local_address": [
+        "127.0.0.1",
+        39548
+      ],
+      "server_address": [
+        "127.0.0.1",
+        36671
+      ],
+      "transfers": [
+        {
+          "run_id": "e3e8ff93-5ed3-43e4-bc95-6660d4ca97f1",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.417862205,
+          "transfer_end_s": 419.511345766
+        },
+        {
+          "run_id": "945a233a-5fb2-4dc3-a16a-2bd469c0548e",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.511844616,
+          "transfer_end_s": 419.65591537
+        },
+        {
+          "run_id": "aa8d6832-711d-42ad-8ba4-dd131957fa02",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.660084265,
+          "transfer_end_s": 419.667827327
+        },
+        {
+          "run_id": "e279d504-799c-492b-862d-1f75f23f9cc9",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.668303255,
+          "transfer_end_s": 419.720541218
+        },
+        {
+          "run_id": "b1c6ac7e-3347-4eb5-ba5a-4ae277934de1",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.906376814,
+          "transfer_end_s": 420.355381249
+        },
+        {
+          "run_id": "90d5661e-7343-4df5-a8be-3ce0e70a069b",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 420.355921475,
+          "transfer_end_s": 420.794946553
+        }
+      ],
+      "row_count": 6,
+      "successful_transfers": 6
+    },
+    {
+      "client_id": "client-04",
+      "session_id": "5c0e2a2d-2472-41e6-b37e-14f57dac6821",
+      "status": "PASS",
+      "errors": [],
+      "expected_rows": 6,
+      "local_address": [
+        "127.0.0.1",
+        39550
+      ],
+      "server_address": [
+        "127.0.0.1",
+        36671
+      ],
+      "transfers": [
+        {
+          "run_id": "a47073f5-beea-451e-89d2-6ff11bf2df67",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.402123208,
+          "transfer_end_s": 419.493265713
+        },
+        {
+          "run_id": "098de2b8-680d-4815-a272-de9abf6f627d",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.494521589,
+          "transfer_end_s": 419.577032011
+        },
+        {
+          "run_id": "2c0f31b5-f0e8-464f-a699-7f0d5fe9eddb",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.578592564,
+          "transfer_end_s": 419.584973597
+        },
+        {
+          "run_id": "968a4b9c-cd7f-4497-a0e5-0e16b712771d",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.585332586,
+          "transfer_end_s": 419.59002408
+        },
+        {
+          "run_id": "5bdc5e28-f690-4660-bb5f-444bfe3bb8b5",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.703699555,
+          "transfer_end_s": 420.110934755
+        },
+        {
+          "run_id": "38d6f585-52a3-4146-aa69-54615bc0d9c5",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 420.111630692,
+          "transfer_end_s": 420.565760171
+        }
+      ],
+      "row_count": 6,
+      "successful_transfers": 6
+    },
+    {
+      "client_id": "client-05",
+      "session_id": "5c0e2a2d-2472-41e6-b37e-14f57dac6821",
+      "status": "PASS",
+      "errors": [],
+      "expected_rows": 6,
+      "local_address": [
+        "127.0.0.1",
+        39590
+      ],
+      "server_address": [
+        "127.0.0.1",
+        36671
+      ],
+      "transfers": [
+        {
+          "run_id": "13e4a5ff-70bf-4cc8-b4df-bc2792efae28",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.409370166,
+          "transfer_end_s": 419.494844355
+        },
+        {
+          "run_id": "7d08abda-1bb4-4308-8f55-4759be2b49ec",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.495514774,
+          "transfer_end_s": 419.612625166
+        },
+        {
+          "run_id": "00832a1b-ee4c-421c-9f60-fedce51abf5c",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.618642463,
+          "transfer_end_s": 419.654708643
+        },
+        {
+          "run_id": "8ad9a0ff-40ad-4145-8fad-c636e465bd24",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.655656997,
+          "transfer_end_s": 419.664060041
+        },
+        {
+          "run_id": "deea7a98-6786-46bd-b381-cad09ae97a1f",
+          "direction": "upload",
+          "status": "SUCCESS",
+          "transfer_start_s": 419.767015044,
+          "transfer_end_s": 420.382801122
+        },
+        {
+          "run_id": "0fd14adc-e3ea-4ed9-a1e9-10755d2ad3d0",
+          "direction": "download",
+          "status": "SUCCESS",
+          "transfer_start_s": 420.386223618,
+          "transfer_end_s": 420.861308677
+        }
+      ],
+      "row_count": 6,
+      "successful_transfers": 6
+    }
+  ]
+}

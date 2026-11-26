@@ -1,12 +1,12 @@
-# Hướng dẫn TCP Server — Sprint 1
+# Hướng dẫn TCP Server — bản tích hợp Sprint 2
 
-Tài liệu này mô tả server tuần tự đi kèm nhánh `ha-nguyet`. Server concurrent từ `cn21-10` phải chạy trong thư mục riêng; xem [README](../README.md) cho quy trình Windows 1/5/10 client. SHA-256 đã được hỗ trợ trong protocol hiện tại.
+Nhánh ha-nguyet đã đồng bộ Server concurrent và Storage locking từ main 3c53731. Source Server/Storage giữ nguyên bản đã merge của nhóm. Xem [README](../README.md) để chạy Windows 1/5/10 client trong cùng checkout.
 
 ## Cấu trúc và phạm vi
 
 Code tuân theo cấu trúc trong README:
 
-- `src/server/server.py`: TCP server tuần tự và xử lý command.
+- `src/server/server.py`: TCP server bounded thread-per-connection và xử lý command.
 - `src/server/config.py`: đọc, kiểm tra cấu hình và ghi đè bằng CLI.
 - `src/server/storage.py`: kiểm tra filename, quản lý file tạm và file đích.
 - `src/server/logging_config.py`: logging JSON Lines.
@@ -19,10 +19,7 @@ Code tuân theo cấu trúc trong README:
 - `results/`, `plots/`, `demo/`: dành cho kết quả benchmark, biểu đồ và demo sau này.
 - `report/protocol.md`: đặc tả application protocol.
 
-Sprint 1 tập trung vào tính đúng: server phục vụ một client tại một thời điểm.
-Client hiện tại cần đóng kết nối, gửi `QUIT` hoặc hết timeout để server xử lý
-client tiếp theo. Multi-client, tài khoản,
-authentication, resume và TLS chưa thuộc phần triển khai Sprint 1.
+Server tạo worker riêng cho từng connection, giới hạn max_clients mặc định 10; connection idle vẫn chiếm slot. Connection vượt giới hạn nhận SERVER_BUSY rồi đóng. Upload/download cùng tên dùng khóa exclusive không chờ qua storage.locked(filename, owner=connection_id); FILE_BUSY trước READY/OK và giữ connection. File khác tên được xử lý đồng thời.
 
 ## Cài đặt
 
@@ -53,7 +50,7 @@ Các lệnh tiếp theo dùng `python` của môi trường ảo. Trên Windows 
 
 ```bat
 set PYTHONPATH=src
-py -3.11 -m server --host 0.0.0.0 --port 5000
+py -3.11 -m server --host 0.0.0.0 --port 5000 --max-clients 10
 ```
 
 Đoạn trên dùng cmd Windows. Với PowerShell dùng `$env:PYTHONPATH="src"`; Linux dùng `PYTHONPATH=src python -m server --host 0.0.0.0 --port 5000`.
@@ -75,6 +72,7 @@ python -m server --help
 | `chunk_size` / `--chunk-size` | `65536` | Kích thước chunk theo byte |
 | `client_timeout` / `--client-timeout` | `30` | Timeout socket khi không tiến triển, tính bằng giây |
 | `max_file_size` / `--max-file-size` | `1073741824` | Upload tối đa 1 GiB |
+| `max_clients` / `--max-clients` | `10` | Số worker/connection active tối đa; khác listen backlog |
 
 Mặc định đọc `configs/server.json`. Tham số CLI được ưu tiên hơn JSON. Đường dẫn
 tương đối trong JSON tính từ thư mục chứa JSON; đường dẫn CLI tính từ thư mục
@@ -132,5 +130,5 @@ python -m pytest
 Test dùng loopback TCP thật với port do hệ điều hành chọn và storage tạm, bao gồm
 file nhị phân, file rỗng, ghi đè, các command, `FILE_NOT_FOUND`, input không hợp lệ,
 TCP fragmentation, frame gộp, ngắt giữa chừng, timeout, lỗi ghi file và log.
-Thread chỉ dùng trong test để điều khiển server; server vẫn xử lý tuần tự.
+Server production dùng worker thread; fixture tuần tự chỉ còn trong test đối chứng âm của runner.
 Kết nối giữa hai máy cần xác nhận thực tế theo hướng dẫn LAN ở trên.

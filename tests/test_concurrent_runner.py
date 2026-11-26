@@ -1,7 +1,7 @@
 """Real TCP runner tests; temporary CSVs never touch Sprint 1 data.
 
-Set CONCURRENT_SERVER_FILE to cn21-10/src/server/server.py to also exercise
-that dependency's implementation instead of the test-only threaded fixture.
+Production concurrent Server/Storage are used by default. A deliberately
+sequential fixture is only used as a negative concurrency control.
 """
 import csv
 from datetime import datetime, timezone
@@ -17,7 +17,6 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -32,12 +31,8 @@ from common.csv_logger import CONCURRENT_FIELDS, FIELDS
 from common.environment import collect_host
 
 
-class ThreadedProtocolFixture(FileServer):
-    """Test-only concurrency adapter; product server remains unchanged."""
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.sockets = []
-        self.threads = []
+class SequentialFileServer(FileServer):
+    """Legacy sequential fixture: intentionally fails multi-client READY gates."""
 
     def serve_forever(self):
         listener = self.listener
@@ -51,33 +46,17 @@ class ThreadedProtocolFixture(FileServer):
                     if self.stopping:
                         break
                     raise
-                self.sockets.append(sock)
-                def handle(sock=sock, address=address):
-                    with sock:
-                        sock.settimeout(3)
-                        self._handle_client(sock, address)
-                thread = threading.Thread(target=handle, daemon=True)
-                self.threads.append(thread)
-                thread.start()
+                with sock:
+                    sock.settimeout(self.config.client_timeout)
+                    self._handle_client(sock, address)
         finally:
             self.close()
-
-    def close(self):
-        super().close()
-        for sock in self.sockets:
-            try:
-                sock.shutdown(socket.SHUT_RDWR)
-            except OSError:
-                pass
-        for thread in self.threads:
-            if thread is not threading.current_thread():
-                thread.join(3)
 
 
 def concurrent_server_class():
     dependency = os.environ.get("CONCURRENT_SERVER_FILE")
     if not dependency:
-        return ThreadedProtocolFixture
+        return FileServer
     path = Path(dependency).resolve()
     spec = importlib.util.spec_from_file_location("server.concurrent_dependency", path)
     module = importlib.util.module_from_spec(spec)
@@ -114,8 +93,7 @@ class ConcurrentRunnerTests(unittest.TestCase):
     def start_server(self, sequential=False):
         config = ServerConfig(host="127.0.0.1", port=0, storage_dir=self.root / "storage",
                               log_file=self.root / "server.log", client_timeout=3)
-        config = SimpleNamespace(**vars(config), max_clients=10)
-        cls = FileServer if sequential else concurrent_server_class()
+        cls = SequentialFileServer if sequential else concurrent_server_class()
         self.server = cls(config, logging.getLogger("runner-test"))
         self.server.start()
         def serve():

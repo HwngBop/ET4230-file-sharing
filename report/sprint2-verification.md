@@ -1,5 +1,7 @@
 # Kiểm chứng tương thích server concurrent
 
+> Bản ghi lịch sử. Kiểm chứng source đã tích hợp ngày 26/11: [kết quả mới](sprint2-integration-verification.md).
+
 Ngày chạy: 22/11/2026. Runner trên nhánh `ha-nguyet`; server từ nhánh `cn21-10`, commit `a07b9503bb8d942cd16c3b1895ba06f1ecbff88d`. Không thay đổi code hoặc nhánh server/main.
 
 ## Môi trường và phạm vi

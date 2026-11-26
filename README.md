@@ -2,11 +2,9 @@
 
 Bộ công cụ đo lường và kiểm thử truyền file TCP cho Sprint 1–2: tạo dữ liệu, xác minh SHA-256, đo thời gian, tính throughput Mbps, lưu CSV/metadata và chạy 1/5/10 client đồng thời.
 
-Nhánh **`ha-nguyet`** chứa client, baseline runner, concurrent runner và tài liệu. Server đi kèm nhánh này là bản tuần tự. Để kiểm thử nhiều client, dùng server từ **`cn21-10`** trong một thư mục riêng. Không cần merge các nhánh để chạy thử.
+Nhánh **`ha-nguyet`** đã đồng bộ Backend, Client Reliability và runner từ `main` tại `3c53731` (26/11/2026), đồng thời giữ các kiểm tra CSV bổ sung. Một thư mục code đủ chạy server và runner trong hai terminal; không cần tải/ghép nhánh server riêng.
 
-**Kế hoạch hiện tại:** [CN21-13 — trạng thái PR và các bước thực hiện](report/sprint2-execution-plan.md). PR #8 chưa merge: chỉ chuẩn bị runner/test, chưa tích hợp cuối client.py. API Backend theo điều phối mới là `locked(filename, owner=connection_id)`.
-
-**Review contract:** [CN21-13 / S2-01 v1.0](report/sprint2-contract-review.md). Code runner đã có kiểm chứng loopback; Windows/LAN và review bản tích hợp còn chờ, chưa phải nghiệm thu DONE.
+**Trạng thái:** regression và loopback được ghi trong [kiểm chứng bản tích hợp](report/sprint2-integration-verification.md). Windows/Python 3.11 và LAN hai máy vẫn cần chạy thực tế trước nghiệm thu cuối. PR #10 đang mở không thuộc bản này.
 
 ## 1. Điều kiện chạy
 
@@ -31,31 +29,30 @@ py -3.11 -m pip install psutil==7.1.3
 
 Nếu không lấy được thông tin phần cứng, metadata giữ null/unknown. Không tự điền số ước lượng.
 
-## 2. Tải hai thư mục code
+## 2. Tải code
 
 ### Cách A — Download ZIP, không cần Git
 
-1. Mở [nhánh ha-nguyet](https://github.com/HwngBop/ET4230-file-sharing/tree/ha-nguyet), chọn **Code → Download ZIP** rồi **Extract All**.
-2. Mở [nhánh cn21-10](https://github.com/HwngBop/ET4230-file-sharing/tree/cn21-10), tải và giải nén tương tự.
-3. Giữ hai thư mục tách biệt. Có thể đổi tên thư mục giải nén thành `runner` và `server` để dễ nhận biết.
-4. Trong mỗi thư mục, vào đến nơi thấy `README.md`, `src`, `scripts`, `configs`. Đây là thư mục gốc dùng cho các lệnh tương ứng.
+1. Mở [nhánh ha-nguyet](https://github.com/HwngBop/ET4230-file-sharing/tree/ha-nguyet), chọn **Code → Download ZIP**.
+2. Nhấp phải ZIP → **Extract All**. Dùng thư mục mới để giữ bản/kết quả cũ.
+3. Mở thư mục vừa giải nén, vào nơi thấy `README.md`, `src`, `scripts`, `configs`. Đây là thư mục gốc cho mọi lệnh bên dưới.
 
-Không copy đè code nhánh server lên nhánh runner. File nguồn của hai thư mục không cần trộn với nhau.
+Chỉ cần thư mục này cho cả server và runner. Không copy đè client.py hoặc storage.py từ PR đang mở.
 
 ### Cách B — Git
 
-Chạy trong một thư mục làm việc mới:
+Trong thư mục làm việc mới:
 
 ```bat
-git clone --branch ha-nguyet https://github.com/HwngBop/ET4230-file-sharing.git runner
-git clone --branch cn21-10 https://github.com/HwngBop/ET4230-file-sharing.git server
+git clone --branch ha-nguyet https://github.com/HwngBop/ET4230-file-sharing.git
+cd ET4230-file-sharing
 ```
 
-Nếu cập nhật checkout đã có, kiểm tra `git status` và lưu các thay đổi trước; không dùng lệnh reset/xóa để ép cập nhật. ZIP không có lịch sử Git, vì vậy commit metadata có thể là null; giữ ZIP/revision và source_sha256 cùng kết quả.
+Với checkout đã có, kiểm tra `git status` và lưu thay đổi trước khi cập nhật. ZIP không có lịch sử Git nên commit metadata có thể là null; giữ bản tải/revision và source_sha256 cùng kết quả.
 
-## 3. Tạo file thử nghiệm trong thư mục runner
+## 3. Tạo file thử nghiệm
 
-Mở thư mục gốc **runner** bằng File Explorer. Bấm thanh địa chỉ phía trên, nhập `cmd`, nhấn Enter. Cửa sổ cmd mở tại đúng thư mục đó.
+Mở thư mục gốc đã giải nén bằng File Explorer. Bấm thanh địa chỉ phía trên, nhập `cmd`, nhấn Enter. Cửa sổ cmd mở tại đúng thư mục đó.
 
 Chạy:
 
@@ -75,7 +72,7 @@ File có sẵn thì dùng lại. Chỉ thêm `--force` nếu chủ động muố
 
 ## 4. Mở server concurrent trên cùng máy
 
-Mở thư mục gốc **server** bằng File Explorer, nhập `cmd` trên thanh địa chỉ như bước trên. Đây là **terminal server**, độc lập với terminal runner.
+Mở lại **cùng thư mục gốc code** bằng File Explorer, nhập `cmd` trên thanh địa chỉ. Đây là **terminal server** thứ hai; giữ terminal runner của bước 3 để dùng tiếp.
 
 Export metadata server trước:
 
@@ -92,7 +89,7 @@ py -3.11 -m server --host 127.0.0.1 --port 5000 --chunk-size 65536 --max-clients
 
 Đợi log **LISTENING**. Giữ terminal server mở. Nếu `--max-clients` không được nhận diện, đang dùng nhánh server tuần tự hoặc bản cũ.
 
-Trong File Explorer, copy file **server/results/s2-server-host.json** sang **runner/results/s2-server-host.json**. Chỉ copy file metadata này; nó phải được export từ đúng server. Nếu hai thư mục trên hai máy, cũng chuyển file theo cách tương tự.
+Khi cùng máy/cùng thư mục, metadata đã ở `results/s2-server-host.json`, không cần copy. Khi chạy hai máy, export trên máy server và copy JSON này vào thư mục `results/` trên máy client. Không tạo metadata server trên máy client.
 
 ## 5. Chạy lần lượt 1, 5, 10 client
 
@@ -207,17 +204,13 @@ set PYTHONPATH=src
 py -3.11 -m unittest discover -s tests -v
 ```
 
-Để các test concurrent dùng implementation server từ thư mục server thực tế, đặt thêm biến sau; **thay đường dẫn ví dụ**:
+Test runner mặc định dùng Server và Storage production trong cùng checkout. Fixture tuần tự chỉ là đối chứng âm, phải FAIL gate khi chạy nhiều client. Không cần đặt CONCURRENT_SERVER_FILE cho quy trình thông thường. Nếu từng đặt biến này trong cmd, bỏ biến trước để tránh dùng nhầm source cũ:
 
 ```bat
-set CONCURRENT_SERVER_FILE=C:\Projects\server\src\server\server.py
-py -3.11 -m unittest discover -s tests -v
 set CONCURRENT_SERVER_FILE=
 ```
 
-Nếu không đặt biến, test dùng fixture threaded riêng; fixture không thay server production. Kết quả kiểm chứng revision hiện tại xem [report/sprint2-verification.md](report/sprint2-verification.md). Chạy trên Linux/Python 3.12 không thay chứng nhận chạy Windows/Python 3.11.
-
-Server `cn21-10` tại `a07b950` còn gọi optional `try_lock_file`; theo điều phối mới Server phải chuyển sang `locked(filename, owner=connection_id)` mà Storage PR #7 cung cấp. Backend chưa tích hợp và các test khóa hiện tự cung cấp helper. Vì vậy, không coi test đó là bằng chứng server production đã khóa file trùng tên. Runner dùng tên riêng từng phiên/worker. Client ghi FILE_BUSY là FAILED và giữ kết nối để có thể thử lại.
+Thông tin source/revision và kết quả mới nhất xem [sprint2-integration-verification.md](report/sprint2-integration-verification.md). Kết quả Linux/Python 3.12 không thay chứng nhận Windows/Python 3.11.
 
 Theo contract, regression tích hợp cần chạy pytest. Trong terminal runner (sau khi đặt PYTHONPATH và tùy chọn CONCURRENT_SERVER_FILE như trên):
 
@@ -230,7 +223,7 @@ Suite PASS trên một nhánh hoặc server riêng không thay full regression c
 
 ## 11. Sprint 1 và client tương tác
 
-Server đi kèm `ha-nguyet` vẫn chạy tuần tự, dùng được cho baseline một client. Hướng dẫn đo một client: [report/measurement-guide.md](report/measurement-guide.md).
+Server đi kèm `ha-nguyet` hiện là concurrent; baseline một client vẫn chạy được và giữ phương pháp đo Sprint 1. Kết quả mới phải ghi CSV riêng để so sánh đúng phiên bản/điều kiện, không ghi đè baseline cũ. Hướng dẫn đo một client: [report/measurement-guide.md](report/measurement-guide.md).
 
 Chạy client tương tác từ runner:
 
@@ -263,7 +256,7 @@ Khi nghiệm thu LAN, thay host bằng IP server thật. Smoke test có thể gh
 | Không tìm thấy py/Python | Cài Python 3.11 và mở lại cmd |
 | Không thấy script | Đứng tại thư mục gốc chứa src/scripts; không ở thư mục cha của ZIP |
 | No module named server | Chạy `set PYTHONPATH=src` trong terminal server trước lệnh chạy |
-| unrecognized --max-clients | Dùng thư mục server từ cn21-10, không dùng server tuần tự trong runner |
+| unrecognized --max-clients | Tải lại bản ha-nguyet đã tích hợp, không dùng checkout server tuần tự cũ |
 | Connection refused | Server chưa LISTENING, sai IP hoặc port |
 | Timeout/concurrency FAIL | Kiểm tra server concurrent, số slot, firewall, tải máy; không chỉ xem CONNECTED |
 | SERVER_BUSY | Server hết slot; đóng phiên cũ hoặc kiểm tra --max-clients |
@@ -288,3 +281,5 @@ Sau khi thử xong, Ctrl+C ở terminal server. Runner không tự xóa file đ�
 - [Kế hoạch CN21-13 và điều kiện tích hợp sau PR #8](report/sprint2-execution-plan.md)
 
 - [Kiểm chứng phần chuẩn bị runner ngày 23/11](report/sprint2-preparation-verification.md)
+
+- [Kiểm chứng bản đồng bộ main ngày 26/11](report/sprint2-integration-verification.md)

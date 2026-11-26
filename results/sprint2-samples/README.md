@@ -1,5 +1,7 @@
 # Mẫu nghiệm thu Sprint 2
 
+> Bản ghi lịch sử. Kiểm chứng source đã tích hợp ngày 26/11: [kết quả mới](../../report/sprint2-integration-verification.md).
+
 Kết quả từ ba phiên CLI chạy thật ngày 22/11/2026 trên cùng máy Linux/Python 3.12.14, server `cn21-10` tại `a07b950`, max_clients=10, buffer hai phía 65536 byte. Mỗi client upload/download ba file đúng 1.000.000, 10.000.000 và 50.000.000 byte.
 
 | Thư mục | Client | Dòng CSV | Kết quả |

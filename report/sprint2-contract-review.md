@@ -1,12 +1,12 @@
 # CN21-13 — Review S2-01 v1.0
 
-Ngày rà soát: 23/11/2026. Nguồn yêu cầu: **ET4230-S2-01 — Multi-client Architecture & Protocol Contract v1.0**, Hưng ban hành ngày 20/11/2026, attachment CN21-9. Tài liệu này đối chiếu phần Concurrent Testing/CSV; không thay thế hoặc sửa frozen contract. Thông báo điều phối mới chốt `locked(filename, owner=connection_id)` và chỉ tích hợp runner sau PR #8 merge; xem [kế hoạch hiện tại](sprint2-execution-plan.md).
+Ngày rà soát: 26/11/2026. Nguồn yêu cầu: **ET4230-S2-01 — Multi-client Architecture & Protocol Contract v1.0**, Hưng ban hành ngày 20/11/2026, attachment CN21-9. Tài liệu này đối chiếu phần Concurrent Testing/CSV; không thay thế hoặc sửa frozen contract. Thông báo điều phối mới chốt `locked(filename, owner=connection_id)` và chỉ tích hợp runner sau PR #8 merge; xem [kế hoạch hiện tại](sprint2-execution-plan.md).
 
 ## 1. Trạng thái
 
 **Code runner: READY FOR REVIEW. Nghiệm thu tổng thể: PENDING. Chưa đủ căn cứ chuyển DONE.**
 
-Review target là nhánh `ha-nguyet`. PR #6 vẫn trỏ `ha-nguyet-s2-concurrent` ở bản cũ; cần Team Lead thống nhất luồng review/tích hợp để không bỏ sót cập nhật. Chưa có xác nhận Jira/review/merge được thực hiện thay thành viên.
+Review target là nhánh ha-nguyet đã đồng bộ main 3c53731. PR #7/#9/#8/#6 đã merge; PR #6 lấy bản runner cũ, vì vậy giữ các kiểm tra CSV bổ sung của ha-nguyet và chạy lại regression sau ghép. Xem [kế hoạch hiện tại](sprint2-execution-plan.md).
 
 ## 2. Phần CN21-13 đã triển khai
 
@@ -30,32 +30,34 @@ Upload đầu tính cả thời gian chờ READY gate. Kết quả chứng minh 
 
 | Dependency | Tình trạng cần review |
 | --- | --- |
-| S2-02 / CN21-10 — Server | Server concurrent được kiểm tra tại a07b950; cần ghép đúng storage API |
-| S2-03 / CN21-11 — Client | PR #8 đã có SERVER_BUSY fatal nhưng còn OPEN; sau merge phải ghép với optional fields của runner, không overwrite |
-| S2-04 / CN21-12 — Storage | Theo điều phối mới, locked(filename, owner=connection_id) là API đích; Storage PR #7 có locked, Server a07b950 còn gọi try_lock_file nên Backend chưa tích hợp |
+| S2-02 / CN21-10 — Server | PR #9 đã merge; source dùng locked(filename, owner=connection_id) |
+| S2-03 / CN21-11 — Client | PR #8/#6 đã merge; giữ source main với reliability và optional fields, PR #10 còn chờ review |
+| S2-04 / CN21-12 — Storage | PR #7 đã merge, Server đã gọi locked(..., owner=connection_id) |
 | S2-01 / CN21-9 — Team Lead | Chốt interface/review và xác nhận branch dùng tích hợp; contract cần đổi phải có version mới |
 | S2-06 — Integration | Merge theo dependency, full regression tích hợp và LAN E2E do Team Lead điều phối |
 
-Client không chờ greeting ở connect, không gửi payload trước READY. FILE_BUSY được kiểm tra bằng test response recoverable và retry cùng socket. Test này không chứng minh storage production đã có lock. Không thay SERVER_BUSY sang recoverable hoặc đổi tên API để né lỗi tích hợp.
+Client không chờ greeting ở connect, không gửi payload trước READY. FILE_BUSY được kiểm tra cả trong test response của runner và test_server_file_busy với Server/Storage production. Kết quả chi tiết nằm trong report tích hợp. Không thay SERVER_BUSY sang recoverable hoặc đổi tên API để né lỗi tích hợp.
 
 Không chỉnh source Server/Storage/Protocol hoặc tự merge vào main trong phần CN21-13. Các sửa đổi reliability của Member Client cần được giữ khi rebase/merge có thứ tự và chạy lại regression. Không tự động retry payload hoặc phát sinh greeting/frame mới.
 
 ## 4. Review gate trước DONE
 
 - [x] Runner 1/5/10 có gate, per-worker CSV, identifiers, metadata và test plan.
-- [x] Kiểm chứng loopback AC02/AC11 với server a07b950; kết quả/test log nằm trong sprint2-verification và samples.
+- [x] Kiểm chứng loopback AC02/AC11 trên bản tích hợp main 3c53731; kết quả/log nằm trong sprint2-integration-verification.
 - [x] Regression nhánh runner và suite server riêng được thực thi; đây không phải full regression của bản đã tích hợp Storage/Client mới.
 - [ ] Team Lead nhận xác nhận S2-01 v1.0 tại CN21-9.
 - [ ] Team Lead thống nhất PR/branch review cho bản mới trên ha-nguyet.
-- [ ] Backend dùng locked(filename, owner=connection_id), không bỏ qua khóa và đã được tích hợp/review.
-- [ ] PR #8 đã merge; runner ghép client.py sau đó, giữ đủ reliability và optional fields.
-- [ ] Full regression bản tích hợp PASS theo AC01.
+- [x] Backend dùng locked(filename, owner=connection_id), đã được merge qua PR #7/#9.
+- [x] PR #8/#6 đã merge; ha-nguyet đồng bộ client.py giữ đủ reliability và optional fields.
+- [x] Full regression checkout tích hợp trên Linux PASS; Windows/LAN vẫn cần nghiệm thu riêng.
 - [ ] Chạy Windows/Python 3.11 sau tích hợp, lưu kết quả thực tế.
 - [ ] LAN PC Server Ethernet → laptop Wi-Fi, ít nhất 5 client E2E theo AC12 do Hưng điều phối; lưu CSV/log/metadata và ảnh/capture nếu thu được.
 - [ ] Team Lead chấp nhận phạm vi còn loại trừ (nếu có) và duyệt trạng thái cuối.
 
 ACK contract là xác nhận đã thống nhất thiết kế, không thay nghiệm thu hoặc code review. Gate còn mở thì giữ trạng thái REVIEW/IN PROGRESS, không chuyển DONE và không sửa CSV để hợp thức hóa.
 
-## 5. Lịch điều phối hiện tại
+## 5. Lịch điều phối và kết quả mới
 
-Backend hoàn thiện trước 25/11, dự kiến Team Lead review 26/11; Client trước 28/11; runner trước 29/11, tích hợp cuối chỉ sau PR #8 merge. Trạng thái và kế hoạch từng gate được ghi tại [sprint2-execution-plan.md](sprint2-execution-plan.md). Không coi ngày dự kiến là bằng chứng dependency đã hoàn tất.
+Backend hoàn thiện trước 25/11, dự kiến Team Lead review 26/11; Client trước 28/11; runner trước 29/11, điều kiện PR #8 merge đã đạt ngày 26/11. Trạng thái và kế hoạch từng gate được ghi tại [sprint2-execution-plan.md](sprint2-execution-plan.md). Không coi ngày dự kiến là bằng chứng dependency đã hoàn tất.
+
+Bản ghi mới: [sprint2-integration-verification.md](sprint2-integration-verification.md). Các kết quả a07b950 ở trên là lịch sử, không thay bằng chứng trên revision tích hợp.
