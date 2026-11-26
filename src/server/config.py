@@ -18,6 +18,7 @@ class ServerConfig:
     chunk_size: int = 65536
     client_timeout: float = 30.0
     max_file_size: int = 1073741824
+    max_clients: int = 10
 
     def __post_init__(self):
         if not isinstance(self.host, str) or not self.host:
@@ -26,6 +27,7 @@ class ServerConfig:
             ("port", 0, 65535),
             ("chunk_size", 1, 1048576),
             ("max_file_size", 0, 2**63 - 1),
+            ("max_clients", 1, 65535),
         ):
             value = getattr(self, name)
             if type(value) is not int or not minimum <= value <= maximum:
@@ -40,7 +42,7 @@ class ServerConfig:
 
 
 def load_config(argv=None):
-    parser = argparse.ArgumentParser(description="Sequential TCP file-sharing server")
+    parser = argparse.ArgumentParser(description="Concurrent TCP file-sharing server")
     parser.add_argument("--config", type=Path, default=PROJECT_ROOT / "configs/server.json")
     parser.add_argument("--host", help="Listening IP address")
     parser.add_argument("--port", type=int, help="Listening TCP port")
@@ -49,6 +51,7 @@ def load_config(argv=None):
     parser.add_argument("--chunk-size", type=int, help="Transfer buffer size in bytes")
     parser.add_argument("--client-timeout", type=float, help="Socket inactivity timeout in seconds")
     parser.add_argument("--max-file-size", type=int, help="Maximum upload size in bytes")
+    parser.add_argument("--max-clients", type=int, help="Maximum concurrent client connections")
     args = parser.parse_args(argv)
     try:
         with args.config.open(encoding="utf-8") as stream:
