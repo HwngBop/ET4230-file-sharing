@@ -216,6 +216,12 @@ class RunnerHooksAgainstRealClient(unittest.TestCase):
     def test_server_busy_is_fatal_and_every_later_attempt_still_logs_a_failed_row(self):
         def handler(sock, conn, srv):
             conn.send_header({"status": "ERROR", "code": "SERVER_BUSY", "message": "max_clients"})
+            # Làm giống FileServer._reject_busy_client: shutdown phía ghi rồi đọc nốt lệnh đang bay tới.
+            # Nếu đóng socket ngay khi còn dữ liệu chưa đọc, Windows gửi RST và Client mất SERVER_BUSY (WinError 10053).
+            sock.shutdown(socket.SHUT_WR)
+            sock.settimeout(2)
+            with contextlib.suppress(OSError):
+                sock.recv(65536)
 
         client = self.start(handler)
         self.assertTrue(client.connected)            # connect không chờ greeting
