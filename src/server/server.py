@@ -7,6 +7,7 @@ import re
 import socket
 import sys
 import threading
+import time
 from pathlib import Path
 
 from common.protocol import Connection, PeerDisconnected, ProtocolError
@@ -148,11 +149,21 @@ class FileServer:
                 client.shutdown(socket.SHUT_WR)
             except OSError:
                 pass
-            try:
-                client.settimeout(0.05)
-                client.recv(4096)
-            except OSError:
-                pass
+
+            # Graceful bounded drain: avoid a TCP reset from unread client
+            # request bytes on Windows after sending SERVER_BUSY.
+            deadline = time.monotonic() + 1.0
+            while time.monotonic() < deadline:
+                remaining = deadline - time.monotonic()
+                client.settimeout(min(0.1, remaining))
+                try:
+                    data = client.recv(4096)
+                    if not data:
+                        break
+                except socket.timeout:
+                    continue
+                except OSError:
+                    break
         except OSError:
             pass
         finally:
